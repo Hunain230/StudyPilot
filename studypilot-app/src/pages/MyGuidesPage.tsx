@@ -186,11 +186,11 @@ export default function MyGuidesPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white/40 p-3 rounded-2xl">
                       <p className="text-label-sm text-on-surface-variant mb-1 font-label">Flashcards</p>
-                      <p className="font-headline text-headline-md">{g._count.flashcards}</p>
+                      <p className="font-headline text-headline-md">{g._count?.flashcards || 0}</p>
                     </div>
                     <div className="bg-white/40 p-3 rounded-2xl">
                       <p className="text-label-sm text-on-surface-variant mb-1 font-label">Quizzes</p>
-                      <p className="font-headline text-headline-md">{g._count.quizQuestions}</p>
+                      <p className="font-headline text-headline-md">{g._count?.quizQuestions || 0}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
