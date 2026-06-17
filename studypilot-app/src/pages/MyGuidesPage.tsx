@@ -1,19 +1,75 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { guideService } from "../services/guide.service";
 
-const guides = [
-  { title: "Database Systems", subject: "Computer Science", subjectColor: "primary", source: "PDF", sourceIcon: "description", progress: 85, flashcards: 42, quizzes: 5, weakTopics: 2, weakColor: "error", created: "2d ago", lastOpened: "1h ago", completed: false },
-  { title: "Calculus II", subject: "Math", subjectColor: "secondary", source: "YouTube", sourceIcon: "smart_display", progress: 45, flashcards: 28, quizzes: 3, weakTopics: 7, weakColor: "error", created: "1w ago", lastOpened: "5h ago", completed: false },
-  { title: "Artificial Intelligence", subject: "CS", subjectColor: "primary", source: "Notes", sourceIcon: "edit_note", progress: 92, flashcards: 60, quizzes: 10, weakTopics: 1, weakColor: "primary", created: "3d ago", lastOpened: "30m ago", completed: false },
-  { title: "Organic Chemistry", subject: "Science", subjectColor: "tertiary", source: "PDF", sourceIcon: "description", progress: 30, flashcards: 15, quizzes: 2, weakTopics: 12, weakColor: "error", created: "5d ago", lastOpened: "Yesterday", completed: false },
-  { title: "Microeconomics", subject: "Business", subjectColor: "secondary-container", source: "YouTube", sourceIcon: "smart_display", progress: 68, flashcards: 35, quizzes: 4, weakTopics: 4, weakColor: "on-surface-variant", created: "4d ago", lastOpened: "2h ago", completed: false },
-  { title: "Modern Art", subject: "Arts", subjectColor: "error", source: "Notes", sourceIcon: "edit_note", progress: 100, flashcards: 20, quizzes: 8, weakTopics: 0, weakColor: "green-600", created: "2w ago", lastOpened: "3d ago", completed: true },
-];
+export interface GuideListItem {
+  id: string;
+  title: string;
+  description: string | null;
+  subject: string | null;
+  sourceType: "pdf" | "youtube" | "notes" | "mixed";
+  status: "processing" | "ready" | "failed";
+  createdAt: string;
+  _count: {
+    flashcards: number;
+    quizQuestions: number;
+  };
+}
 
 export default function MyGuidesPage() {
   const [search, setSearch] = useState("");
+  const [guidesList, setGuidesList] = useState<GuideListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = guides.filter(g => g.title.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    const fetchGuides = async () => {
+      try {
+        setLoading(true);
+        const data = await guideService.getAll();
+        setGuidesList(data || []);
+      } catch (err: any) {
+        console.error(err);
+        setError("Failed to load your study guides. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGuides();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this guide?")) {
+      try {
+        await guideService.delete(id);
+        setGuidesList(prev => prev.filter(g => g.id !== id));
+      } catch (err) {
+        console.error(err);
+        alert("Failed to delete the study guide.");
+      }
+    }
+  };
+
+  const getSourceIcon = (type: string) => {
+    switch (type) {
+      case "youtube": return "smart_display";
+      case "notes": return "edit_note";
+      case "mixed": return "layers";
+      default: return "description";
+    }
+  };
+
+  const getSubjectColor = (subject: string | null) => {
+    if (!subject) return "primary";
+    const sub = subject.toLowerCase();
+    if (sub.includes("math") || sub.includes("calc")) return "secondary";
+    if (sub.includes("art") || sub.includes("design")) return "error";
+    if (sub.includes("science") || sub.includes("chem") || sub.includes("phys")) return "tertiary";
+    if (sub.includes("business") || sub.includes("econ")) return "secondary-container";
+    return "primary";
+  };
+
+  const filtered = guidesList.filter(g => g.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <>
@@ -71,74 +127,103 @@ export default function MyGuidesPage() {
       </section>
 
       {/* Guide Grid */}
-      {filtered.length > 0 ? (
+      {loading ? (
+        <div className="flex-grow flex items-center justify-center py-24">
+          <span className="material-symbols-outlined animate-spin text-primary text-5xl">progress_activity</span>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 text-red-600 p-6 rounded-3xl border border-red-200/50 text-center my-12">
+          <p className="font-medium">{error}</p>
+        </div>
+      ) : filtered.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((g) => (
-            <div key={g.title} className={`glass-card glass-card-hover rounded-3xl p-6 flex flex-col ${g.completed ? "border-primary/20 bg-primary/5" : ""}`}>
-              {/* Tag + Menu */}
-              <div className="flex justify-between items-start mb-4">
-                <span className={`bg-${g.subjectColor}/10 text-${g.subjectColor} px-3 py-1 rounded-full text-label-sm font-label`}>{g.subject}</span>
-                <button className="p-1.5 rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant">
-                  <span className="material-symbols-outlined text-lg">more_vert</span>
-                </button>
-              </div>
-
-              {/* Title & Source */}
-              <h3 className="font-headline text-headline-md mb-1">{g.title}</h3>
-              <div className="flex items-center gap-2 mb-6">
-                <span className="material-symbols-outlined text-sm text-secondary">{g.sourceIcon}</span>
-                <span className="text-label-sm text-on-surface-variant font-label">Source: {g.source}</span>
-              </div>
-
-              {/* Stats */}
-              <div className="space-y-4 mb-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-label-sm font-bold font-label">Progress</span>
-                    <span className="text-label-sm font-bold text-primary font-label">{g.progress}%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${g.progress}%` }} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white/40 p-3 rounded-2xl">
-                    <p className="text-label-sm text-on-surface-variant mb-1 font-label">Flashcards</p>
-                    <p className="font-headline text-headline-md">{g.flashcards}</p>
-                  </div>
-                  <div className="bg-white/40 p-3 rounded-2xl">
-                    <p className="text-label-sm text-on-surface-variant mb-1 font-label">Quizzes</p>
-                    <p className="font-headline text-headline-md">{g.quizzes}</p>
-                  </div>
-                </div>
-                <div className={`flex items-center gap-2 text-${g.weakColor}`}>
-                  <span className="material-symbols-outlined text-lg" style={g.completed ? { fontVariationSettings: "'FILL' 1" } : undefined}>
-                    {g.completed ? "verified" : g.weakTopics <= 1 ? "check_circle" : "warning"}
+          {filtered.map((g) => {
+            const isCompleted = g.status === "ready";
+            const progress = g.status === "ready" ? 100 : g.status === "failed" ? 0 : 30;
+            const subjectColor = getSubjectColor(g.subject);
+            
+            return (
+              <div key={g.id} className={`glass-card glass-card-hover rounded-3xl p-6 flex flex-col ${isCompleted ? "border-primary/20 bg-primary/5" : ""}`}>
+                {/* Tag + Delete */}
+                <div className="flex justify-between items-start mb-4">
+                  <span className={`bg-${subjectColor}/10 text-${subjectColor} px-3 py-1 rounded-full text-label-sm font-label`}>
+                    {g.subject || "General"}
                   </span>
-                  <span className="text-label-sm font-medium font-label">
-                    {g.completed ? "Fully Mastered" : `${g.weakTopics} Weak Topic${g.weakTopics !== 1 ? "s" : ""} ${g.weakTopics <= 1 ? "Left" : "Identified"}`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="mt-auto pt-6 border-t border-outline-variant/20 flex flex-col gap-3">
-                <div className="flex justify-between text-label-sm text-on-surface-variant opacity-60 mb-2 font-label">
-                  <span>Created {g.created}</span>
-                  <span>Last opened {g.lastOpened}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button className={`flex-1 ${g.completed ? "bg-surface-container-high text-on-surface" : "bg-primary text-on-primary"} py-2.5 rounded-xl font-label text-label-md hover:brightness-110 transition-all flex items-center justify-center gap-2`}>
-                    <span className="material-symbols-outlined text-base">{g.completed ? "refresh" : "play_arrow"}</span>
-                    {g.completed ? "Review" : "Continue"}
-                  </button>
-                  <button className="p-2.5 border border-outline-variant rounded-xl hover:bg-white transition-all text-on-surface-variant" title="Export PDF">
-                    <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                  <button 
+                    onClick={() => handleDelete(g.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors text-on-surface-variant"
+                    title="Delete Guide"
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
                   </button>
                 </div>
+
+                {/* Title & Source */}
+                <h3 className="font-headline text-headline-md mb-1">{g.title}</h3>
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="material-symbols-outlined text-sm text-secondary">{getSourceIcon(g.sourceType)}</span>
+                  <span className="text-label-sm text-on-surface-variant font-label">Source: {g.sourceType.toUpperCase()}</span>
+                </div>
+
+                {/* Stats */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-label-sm font-bold font-label">Status</span>
+                      <span className="text-label-sm font-bold text-primary font-label uppercase text-[11px]">
+                        {g.status}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          g.status === "failed" ? "bg-red-500" : g.status === "ready" ? "bg-primary" : "bg-amber-500 animate-pulse"
+                        }`}
+                        style={{ width: `${progress}%` }} 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/40 p-3 rounded-2xl">
+                      <p className="text-label-sm text-on-surface-variant mb-1 font-label">Flashcards</p>
+                      <p className="font-headline text-headline-md">{g._count.flashcards}</p>
+                    </div>
+                    <div className="bg-white/40 p-3 rounded-2xl">
+                      <p className="text-label-sm text-on-surface-variant mb-1 font-label">Quizzes</p>
+                      <p className="font-headline text-headline-md">{g._count.quizQuestions}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">
+                      {isCompleted ? "verified" : g.status === "failed" ? "error" : "schedule"}
+                    </span>
+                    <span className="text-label-sm font-medium font-label">
+                      {isCompleted ? "Ready for Study" : g.status === "failed" ? "Failed to generate" : "AI is generating guide..."}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-auto pt-6 border-t border-outline-variant/20 flex flex-col gap-3">
+                  <div className="flex justify-between text-label-sm text-on-surface-variant opacity-60 mb-2 font-label">
+                    <span>Created {new Date(g.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      disabled={g.status === "processing"}
+                      className={`flex-1 ${isCompleted ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface opacity-50 cursor-not-allowed"} py-2.5 rounded-xl font-label text-label-md hover:brightness-110 transition-all flex items-center justify-center gap-2`}
+                    >
+                      <span className="material-symbols-outlined text-base">play_arrow</span>
+                      Study Guide
+                    </button>
+                    <button className="p-2.5 border border-outline-variant rounded-xl hover:bg-white transition-all text-on-surface-variant" title="Export PDF">
+                      <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-center py-24">

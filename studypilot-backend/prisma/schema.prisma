@@ -31,29 +31,32 @@ model User {
 // GUIDE
 // ─────────────────────────────────────────────────────────
 model Guide {
-  id          String      @id @default(uuid())
-  userId      String      @map("user_id")
-  title       String      @db.VarChar(255)
-  description String?     @db.Text
-  subject     String?     @db.VarChar(100)
-  sourceType  SourceType  @default(pdf) @map("source_type")
-  notesText   String?     @map("notes_text") @db.LongText
-  youtubeUrl  String?     @map("youtube_url") @db.VarChar(500)
-  aiSummary   String?     @map("ai_summary") @db.LongText
-  status      GuideStatus @default(processing)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id               String      @id @default(uuid())
+  userId           String      @map("user_id")
+  title            String      @db.VarChar(255)
+  description      String?     @db.Text
+  subject          String?     @db.VarChar(100)
+  sourceType       SourceType  @default(notes) @map("source_type")
+  sourceIdentifier String?     @map("source_identifier") @db.VarChar(512)
+  notesText        String?     @map("notes_text") @db.LongText
+  youtubeUrl       String?     @map("youtube_url") @db.Text
+  aiSummary        String?     @map("ai_summary") @db.LongText
+  status           GuideStatus @default(pending)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   uploadedFiles UploadedFile[]
+  content       GuideContent?
   flashcards    Flashcard[]
   quizQuestions QuizQuestion[]
   weakTopics    WeakTopic[]
   studyPlan     StudyPlan?
   studySessions StudySession[]
   messages      Message[]
+  revisionSheet RevisionSheet?
 
-  @@index([userId])
+  @@index([userId, sourceIdentifier], name: "idx_guides_user_source")
   @@map("guides")
 }
 
@@ -61,12 +64,12 @@ enum SourceType {
   pdf
   notes
   youtube
-  mixed
 }
 
 enum GuideStatus {
+  pending
   processing
-  ready
+  completed
   failed
 }
 
@@ -101,21 +104,41 @@ enum FileType {
 }
 
 // ─────────────────────────────────────────────────────────
-// FLASHCARD
+// GUIDE CONTENT (Phase 2 summary storage)
 // ─────────────────────────────────────────────────────────
-model Flashcard {
-  id           String     @id @default(uuid())
-  guideId      String     @map("guide_id")
-  question     String     @db.Text
-  answer       String     @db.Text
-  difficulty   Difficulty @default(medium)
-  timesReviewed Int       @default(0) @map("times_reviewed")
-  lastReviewed DateTime?  @map("last_reviewed")
-  createdAt    DateTime   @default(now()) @map("created_at")
+model GuideContent {
+  id              String   @id @default(uuid())
+  guideId         String   @unique @map("guide_id")
+  rawContent      String   @map("raw_content") @db.LongText
+  cleanedContent  String?  @map("cleaned_content") @db.LongText
+  shortSummary    String?  @map("short_summary") @db.Text
+  detailedSummary String?  @map("detailed_summary") @db.LongText
+  keyConcepts     Json?    @map("key_concepts")
+  topics          Json?
+  topicHierarchy  Json?    @map("topic_hierarchy")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
 
   guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
 
-  @@index([guideId])
+  @@map("guide_content")
+}
+
+// ─────────────────────────────────────────────────────────
+// FLASHCARD
+// ─────────────────────────────────────────────────────────
+model Flashcard {
+  id         String     @id @default(uuid())
+  guideId    String     @map("guide_id")
+  question   String     @db.Text
+  answer     String     @db.Text
+  difficulty Difficulty @default(medium)
+  orderIndex Int        @default(0) @map("order_index")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@index([guideId], name: "idx_flashcards_guide")
   @@map("flashcards")
 }
 
@@ -129,22 +152,50 @@ enum Difficulty {
 // QUIZ QUESTION
 // ─────────────────────────────────────────────────────────
 model QuizQuestion {
-  id            String   @id @default(uuid())
-  guideId       String   @map("guide_id")
-  question      String   @db.Text
-  optionA       String   @map("option_a") @db.Text
-  optionB       String   @map("option_b") @db.Text
-  optionC       String   @map("option_c") @db.Text
-  optionD       String   @map("option_d") @db.Text
-  correctOption String   @map("correct_option") @db.Char(1)
-  explanation   String?  @db.Text
-  topicTag      String?  @map("topic_tag") @db.VarChar(100)
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                 String   @id @default(uuid())
+  guideId            String   @map("guide_id")
+  question           String   @db.Text
+  options            Json
+  correctAnswerIndex Int      @map("correct_answer_index") @db.TinyInt
+  explanation        String?  @db.Text
+  orderIndex         Int      @default(0) @map("order_index")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
 
-  @@index([guideId])
+  @@index([guideId], name: "idx_quiz_guide")
   @@map("quiz_questions")
+}
+
+// ─────────────────────────────────────────────────────────
+// REVISION SHEET
+// ─────────────────────────────────────────────────────────
+model RevisionSheet {
+  id        String            @id @default(uuid())
+  guideId   String            @unique @map("guide_id")
+  title     String            @db.VarChar(255)
+  createdAt DateTime          @default(now()) @map("created_at")
+  sections  RevisionSection[]
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@map("revision_sheets")
+}
+
+// ─────────────────────────────────────────────────────────
+// REVISION SECTION
+// ─────────────────────────────────────────────────────────
+model RevisionSection {
+  id              String   @id @default(uuid())
+  revisionSheetId String   @map("revision_sheet_id")
+  heading         String   @db.VarChar(255)
+  bulletPoints    Json     @map("bullet_points")
+  orderIndex      Int      @default(0) @map("order_index")
+
+  revisionSheet RevisionSheet @relation(fields: [revisionSheetId], references: [id], onDelete: Cascade)
+
+  @@index([revisionSheetId], name: "idx_revision_sections_sheet")
+  @@map("revision_sections")
 }
 
 // ─────────────────────────────────────────────────────────

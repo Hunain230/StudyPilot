@@ -28,6 +28,17 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
       },
     });
 
+    // If it's a PDF and linked to a guide, trigger generation in background
+    if (isPdf && guideId) {
+      const { generateGuideAsync } = require('../services/guideGenerationService');
+      generateGuideAsync({
+        userId: req.user!.userId,
+        guideId,
+        sourceType: 'pdf',
+        pdfFilePath: file.path,
+      });
+    }
+
     // We convert BigInt to string in JSON response to prevent serialization errors
     const responseData = {
       ...saved,

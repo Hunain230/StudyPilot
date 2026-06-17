@@ -17,4 +17,9 @@ export const ENV = {
   FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
   UPLOAD_DIR: process.env.UPLOAD_DIR || './uploads',
   MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB || '25', 10),
+  GROQ_API_KEY: required('GROQ_API_KEY'),
+  GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+  GROQ_MAX_TOKENS: parseInt(process.env.GROQ_MAX_TOKENS || '4096', 10),
+  GROQ_TEMPERATURE: parseFloat(process.env.GROQ_TEMPERATURE || '0.3'),
+  GROQ_RPM_LIMIT: parseInt(process.env.GROQ_RPM_LIMIT || '25', 10),
 };

@@ -1,18 +1,32 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+import { authService } from "../services/auth.service";
+
 export default function SignUpPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+    try {
+      await authService.signup(name, email, password);
       navigate("/guides");
-    }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err.response?.data?.message || "Registration failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,13 +56,34 @@ export default function SignUpPage() {
 
           {/* Form */}
           <form className="w-full space-y-5" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3.5 rounded-lg text-body-sm font-medium border border-red-200/50">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <label className="font-label text-label-md text-on-surface-variant block ml-1" htmlFor="name">Full Name</label>
-              <input className="input-soft w-full px-4 py-3.5 rounded-lg font-body text-on-surface placeholder-outline-variant" id="name" placeholder="Alex Johnson" type="text" />
+              <input
+                className="input-soft w-full px-4 py-3.5 rounded-lg font-body text-on-surface placeholder-outline-variant"
+                id="name"
+                placeholder="Alex Johnson"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-2">
               <label className="font-label text-label-md text-on-surface-variant block ml-1" htmlFor="email">Email Address</label>
-              <input className="input-soft w-full px-4 py-3.5 rounded-lg font-body text-on-surface placeholder-outline-variant" id="email" placeholder="alex@university.edu" type="email" />
+              <input
+                className="input-soft w-full px-4 py-3.5 rounded-lg font-body text-on-surface placeholder-outline-variant"
+                id="email"
+                placeholder="alex@university.edu"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-2">
               <label className="font-label text-label-md text-on-surface-variant block ml-1" htmlFor="password">Password</label>
@@ -58,6 +93,9 @@ export default function SignUpPage() {
                   id="password"
                   placeholder="••••••••"
                   type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
                 <button
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"

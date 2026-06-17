@@ -1,6 +1,20 @@
 import { Link } from "react-router-dom";
+import type { UserProfile } from "./DashboardLayout";
 
-export default function TopBar() {
+interface TopBarProps {
+  user: UserProfile;
+}
+
+export default function TopBar({ user }: TopBarProps) {
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  };
+
   return (
     <header className="fixed top-0 right-0 left-[280px] h-16 bg-white/70 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-gutter z-40">
       {/* Search */}
@@ -25,7 +39,7 @@ export default function TopBar() {
           >
             local_fire_department
           </span>
-          <span className="text-label-md font-bold text-secondary font-label">12 Day Streak</span>
+          <span className="text-label-md font-bold text-secondary font-label">1 Day Streak</span>
         </div>
 
         {/* Action Buttons */}
@@ -37,9 +51,13 @@ export default function TopBar() {
             <span className="material-symbols-outlined">help</span>
           </button>
           <Link to="/guides" className="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden block">
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-sm">
-              SJ
-            </div>
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-sm">
+                {getInitials(user.name)}
+              </div>
+            )}
           </Link>
         </div>
       </div>

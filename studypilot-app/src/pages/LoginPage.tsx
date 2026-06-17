@@ -1,17 +1,29 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { authService } from "../services/auth.service";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+    try {
+      await authService.login(email, password);
       navigate("/guides");
-    }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err.response?.data?.message || "Invalid email or password. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,12 +48,20 @@ export default function LoginPage() {
 
           {/* Form */}
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3.5 rounded-xl text-body-sm font-medium border border-red-200/50">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block font-label text-label-md text-on-surface-variant mb-2 ml-1">Email Address</label>
               <input
                 className="input-soft w-full px-4 py-3.5 rounded-xl border-none font-body text-on-surface placeholder:text-outline-variant"
                 placeholder="scholar@study.ai"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
             <div>
@@ -53,6 +73,9 @@ export default function LoginPage() {
                 className="input-soft w-full px-4 py-3.5 rounded-xl border-none font-body text-on-surface placeholder:text-outline-variant"
                 placeholder="••••••••"
                 type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
             <button

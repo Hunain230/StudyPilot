@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
+import type { UserProfile } from "./DashboardLayout";
+import { authService } from "../../services/auth.service";
 
 const navItems = [
   { label: "Dashboard", icon: "dashboard", href: "/guides" },
@@ -9,8 +11,28 @@ const navItems = [
   { label: "Settings", icon: "settings", href: "/settings" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  user: UserProfile;
+}
+
+export default function Sidebar({ user }: SidebarProps) {
   const location = useLocation();
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  };
+
+  const handleLogout = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (window.confirm("Are you sure you want to log out?")) {
+      authService.logout();
+    }
+  };
 
   return (
     <aside className="w-[280px] h-screen fixed left-0 top-0 bg-white/70 backdrop-blur-xl border-r border-outline-variant/30 flex flex-col py-unit px-margin-mobile z-50">
@@ -70,19 +92,26 @@ export default function Sidebar() {
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden bg-surface-container">
-              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-sm">
-                SJ
-              </div>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-sm">
+                  {getInitials(user.name)}
+                </div>
+              )}
             </div>
             <div>
-              <p className="text-label-md font-bold text-on-surface">Scholar J.</p>
-              <Link
-                to="/"
-                className="flex items-center gap-1 text-body-sm text-on-surface-variant hover:text-primary transition-colors"
+              <p className="text-label-md font-bold text-on-surface max-w-[100px] truncate" title={user.name}>
+                {user.name}
+              </p>
+              <a
+                href="#"
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-body-sm text-on-surface-variant hover:text-primary transition-colors font-body"
               >
-                <span className="material-symbols-outlined text-sm">logout</span>
+                <span className="material-symbols-outlined text-sm font-body">logout</span>
                 Log out
-              </Link>
+              </a>
             </div>
           </div>
           <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors">
