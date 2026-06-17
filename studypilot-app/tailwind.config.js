@@ -1,0 +1,138 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#004ac6",
+        "primary-container": "#2563eb",
+        "primary-fixed": "#dbe1ff",
+        "primary-fixed-dim": "#b4c5ff",
+        "on-primary": "#ffffff",
+        "on-primary-container": "#eeefff",
+        "on-primary-fixed": "#00174b",
+        "on-primary-fixed-variant": "#003ea8",
+        "inverse-primary": "#b4c5ff",
+
+        secondary: "#712ae2",
+        "secondary-container": "#8a4cfc",
+        "secondary-fixed": "#eaddff",
+        "secondary-fixed-dim": "#d2bbff",
+        "on-secondary": "#ffffff",
+        "on-secondary-container": "#fffbff",
+        "on-secondary-fixed": "#25005a",
+        "on-secondary-fixed-variant": "#5a00c6",
+
+        tertiary: "#784b00",
+        "tertiary-container": "#996100",
+        "tertiary-fixed": "#ffddb8",
+        "tertiary-fixed-dim": "#ffb95f",
+        "on-tertiary": "#ffffff",
+        "on-tertiary-container": "#ffeedd",
+        "on-tertiary-fixed": "#2a1700",
+        "on-tertiary-fixed-variant": "#653e00",
+
+        error: "#ba1a1a",
+        "error-container": "#ffdad6",
+        "on-error": "#ffffff",
+        "on-error-container": "#93000a",
+
+        surface: "#f8f9ff",
+        "surface-dim": "#cbdbf5",
+        "surface-bright": "#f8f9ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-low": "#eff4ff",
+        "surface-container": "#e5eeff",
+        "surface-container-high": "#dce9ff",
+        "surface-container-highest": "#d3e4fe",
+        "surface-variant": "#d3e4fe",
+        "surface-tint": "#0053db",
+
+        "on-surface": "#0b1c30",
+        "on-surface-variant": "#434655",
+        "on-background": "#0b1c30",
+        background: "#f8f9ff",
+
+        outline: "#737686",
+        "outline-variant": "#c3c6d7",
+
+        "inverse-surface": "#213145",
+        "inverse-on-surface": "#eaf1ff",
+      },
+      borderRadius: {
+        DEFAULT: "0.5rem",
+        sm: "0.25rem",
+        md: "0.75rem",
+        lg: "1rem",
+        xl: "1.5rem",
+        "2xl": "1.5rem",
+        "3xl": "1.5rem",
+        full: "9999px",
+      },
+      spacing: {
+        unit: "8px",
+        gutter: "24px",
+        "container-max": "1280px",
+        "margin-desktop": "48px",
+        "margin-mobile": "16px",
+        "section-padding": "120px",
+        "stack-sm": "12px",
+        "stack-md": "24px",
+        "stack-lg": "48px",
+      },
+      fontFamily: {
+        headline: ["Manrope", "sans-serif"],
+        body: ["Inter", "sans-serif"],
+        label: ["JetBrains Mono", "monospace"],
+      },
+      fontSize: {
+        "display-xl": ["72px", { lineHeight: "1.1", letterSpacing: "-0.04em", fontWeight: "800" }],
+        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "800" }],
+        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "700" }],
+        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "700" }],
+        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.02em", fontWeight: "500" }],
+        "label-sm": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+        "label-caps": ["12px", { lineHeight: "1", letterSpacing: "0.1em", fontWeight: "600" }],
+      },
+      maxWidth: {
+        container: "1280px",
+      },
+      keyframes: {
+        "gradient-shift": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-20px)" },
+        },
+        "pulse-gentle": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
+        "blob-move": {
+          from: { transform: "translate(-10%, -10%)" },
+          to: { transform: "translate(10%, 10%)" },
+        },
+      },
+      animation: {
+        "gradient-shift": "gradient-shift 15s ease infinite",
+        float: "float 6s ease-in-out infinite",
+        "pulse-gentle": "pulse-gentle 2s infinite",
+        "blob-move": "blob-move 20s infinite alternate linear",
+      },
+    },
+  },
+  plugins: [
+    require("@tailwindcss/forms"),
+  ],
+};

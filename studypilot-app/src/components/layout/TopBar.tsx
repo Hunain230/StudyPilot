@@ -1,0 +1,48 @@
+import { Link } from "react-router-dom";
+
+export default function TopBar() {
+  return (
+    <header className="fixed top-0 right-0 left-[280px] h-16 bg-white/70 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-gutter z-40">
+      {/* Search */}
+      <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <div className="relative w-full">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
+          <input
+            className="w-full bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 text-body-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all font-body"
+            placeholder="Search guides, flashcards..."
+            type="text"
+          />
+        </div>
+      </div>
+
+      {/* Right Section */}
+      <div className="flex items-center gap-6">
+        {/* Streak Badge */}
+        <div className="flex items-center gap-2 bg-secondary-fixed/30 px-3 py-1.5 rounded-full border border-secondary-fixed">
+          <span
+            className="material-symbols-outlined text-secondary font-bold text-lg"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            local_fire_department
+          </span>
+          <span className="text-label-md font-bold text-secondary font-label">12 Day Streak</span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+          <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95">
+            <span className="material-symbols-outlined">help</span>
+          </button>
+          <Link to="/guides" className="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden block">
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-sm">
+              SJ
+            </div>
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
