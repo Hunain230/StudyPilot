@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────────────────
+model User {
+  id           String         @id @default(uuid())
+  name         String         @db.VarChar(100)
+  email        String         @unique @db.VarChar(255)
+  passwordHash String         @map("password_hash") @db.VarChar(255)
+  avatarUrl    String?        @map("avatar_url") @db.VarChar(500)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  guides         Guide[]
+  uploadedFiles  UploadedFile[]
+  studySessions  StudySession[]
+  messages       Message[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────
+// GUIDE
+// ─────────────────────────────────────────────────────────
+model Guide {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  title       String      @db.VarChar(255)
+  description String?     @db.Text
+  subject     String?     @db.VarChar(100)
+  sourceType  SourceType  @default(pdf) @map("source_type")
+  notesText   String?     @map("notes_text") @db.LongText
+  youtubeUrl  String?     @map("youtube_url") @db.VarChar(500)
+  aiSummary   String?     @map("ai_summary") @db.LongText
+  status      GuideStatus @default(processing)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploadedFiles UploadedFile[]
+  flashcards    Flashcard[]
+  quizQuestions QuizQuestion[]
+  weakTopics    WeakTopic[]
+  studyPlan     StudyPlan?
+  studySessions StudySession[]
+  messages      Message[]
+
+  @@index([userId])
+  @@map("guides")
+}
+
+enum SourceType {
+  pdf
+  notes
+  youtube
+  mixed
+}
+
+enum GuideStatus {
+  processing
+  ready
+  failed
+}
+
+// ─────────────────────────────────────────────────────────
+// UPLOADED FILE
+// ─────────────────────────────────────────────────────────
+model UploadedFile {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  guideId       String?   @map("guide_id")
+  originalName  String    @map("original_name") @db.VarChar(255)
+  storedName    String    @map("stored_name") @db.VarChar(255)
+  mimeType      String    @map("mime_type") @db.VarChar(100)
+  sizeBytes     BigInt    @map("size_bytes")
+  storagePath   String    @map("storage_path") @db.VarChar(500)
+  fileType      FileType  @default(other) @map("file_type")
+  extractedText String?   @map("extracted_text") @db.LongText
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([guideId])
+  @@map("uploaded_files")
+}
+
+enum FileType {
+  pdf
+  image
+  other
+}
+
+// ─────────────────────────────────────────────────────────
+// FLASHCARD
+// ─────────────────────────────────────────────────────────
+model Flashcard {
+  id           String     @id @default(uuid())
+  guideId      String     @map("guide_id")
+  question     String     @db.Text
+  answer       String     @db.Text
+  difficulty   Difficulty @default(medium)
+  timesReviewed Int       @default(0) @map("times_reviewed")
+  lastReviewed DateTime?  @map("last_reviewed")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@index([guideId])
+  @@map("flashcards")
+}
+
+enum Difficulty {
+  easy
+  medium
+  hard
+}
+
+// ─────────────────────────────────────────────────────────
+// QUIZ QUESTION
+// ─────────────────────────────────────────────────────────
+model QuizQuestion {
+  id            String   @id @default(uuid())
+  guideId       String   @map("guide_id")
+  question      String   @db.Text
+  optionA       String   @map("option_a") @db.Text
+  optionB       String   @map("option_b") @db.Text
+  optionC       String   @map("option_c") @db.Text
+  optionD       String   @map("option_d") @db.Text
+  correctOption String   @map("correct_option") @db.Char(1)
+  explanation   String?  @db.Text
+  topicTag      String?  @map("topic_tag") @db.VarChar(100)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@index([guideId])
+  @@map("quiz_questions")
+}
+
+// ─────────────────────────────────────────────────────────
+// WEAK TOPIC
+// ─────────────────────────────────────────────────────────
+model WeakTopic {
+  id             String   @id @default(uuid())
+  guideId        String   @map("guide_id")
+  topicName      String   @map("topic_name") @db.VarChar(255)
+  score          Float    @default(0.0)
+  recommendation String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@index([guideId])
+  @@map("weak_topics")
+}
+
+// ─────────────────────────────────────────────────────────
+// STUDY PLAN
+// ─────────────────────────────────────────────────────────
+model StudyPlan {
+  id        String   @id @default(uuid())
+  guideId   String   @unique @map("guide_id")
+  planJson  Json     @map("plan_json")
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@map("study_plans")
+}
+
+// ─────────────────────────────────────────────────────────
+// STUDY SESSION
+// ─────────────────────────────────────────────────────────
+model StudySession {
+  id           String       @id @default(uuid())
+  userId       String       @map("user_id")
+  guideId      String?      @map("guide_id")
+  durationSecs Int          @default(0) @map("duration_secs")
+  activityType ActivityType @map("activity_type")
+  startedAt    DateTime     @default(now()) @map("started_at")
+  endedAt      DateTime?    @map("ended_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("study_sessions")
+}
+
+enum ActivityType {
+  reading
+  flashcards
+  quiz
+  notes
+  chat
+}
+
+// ─────────────────────────────────────────────────────────
+// MESSAGE (RAG Chat History)
+// ─────────────────────────────────────────────────────────
+model Message {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  guideId   String?     @map("guide_id")
+  role      MessageRole
+  content   String      @db.LongText
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([guideId])
+  @@map("messages")
+}
+
+enum MessageRole {
+  user
+  assistant
+}
