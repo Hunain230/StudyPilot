@@ -200,6 +200,16 @@ export async function generateGuide(input: PipelineInput) {
     return guideRecord;
   });
 
+  // Step 6.5: Index guide for RAG doubt solving asynchronously (does not block return)
+  try {
+    const { indexGuide } = require('../lib/vectorStore');
+    indexGuide(guide.id, rawContent).catch((err: any) => {
+      console.error('[VectorStore] Async guide indexing failed:', err);
+    });
+  } catch (err) {
+    console.error('[VectorStore] Failed to import indexGuide:', err);
+  }
+
   // Step 7: Return full guide with all relations
   const fullGuide = await prisma.guide.findUnique({
     where: { id: guide.id },

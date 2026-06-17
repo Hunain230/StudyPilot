@@ -19,10 +19,16 @@ model User {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  guides         Guide[]
-  uploadedFiles  UploadedFile[]
-  studySessions  StudySession[]
-  messages       Message[]
+  guides           Guide[]
+  uploadedFiles    UploadedFile[]
+  studySessions    StudySession[]
+  messages         Message[]
+  flashcardReviews FlashcardReview[]
+  quizAttempts     QuizAttempt[]
+  plannerSessions  PlannerSession[]
+  doubtSessions    DoubtSession[]
+  savedResources   Resource[]
+  activityLogs     ActivityLog[]
 
   @@map("users")
 }
@@ -55,6 +61,11 @@ model Guide {
   studySessions StudySession[]
   messages      Message[]
   revisionSheet RevisionSheet?
+  quizAttempts  QuizAttempt[]
+  plannerSessions PlannerSession[]
+  doubtSessions   DoubtSession[]
+  savedResources  Resource[]
+  guideTopics     GuideTopic[]
 
   @@index([userId, sourceIdentifier], name: "idx_guides_user_source")
   @@map("guides")
@@ -136,7 +147,8 @@ model Flashcard {
   orderIndex Int        @default(0) @map("order_index")
   createdAt  DateTime   @default(now()) @map("created_at")
 
-  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  guide   Guide             @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  reviews FlashcardReview[]
 
   @@index([guideId], name: "idx_flashcards_guide")
   @@map("flashcards")
@@ -161,7 +173,8 @@ model QuizQuestion {
   orderIndex         Int      @default(0) @map("order_index")
   createdAt          DateTime @default(now()) @map("created_at")
 
-  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  guide   Guide        @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  results QuizResult[]
 
   @@index([guideId], name: "idx_quiz_guide")
   @@map("quiz_questions")
@@ -233,30 +246,22 @@ model StudyPlan {
 }
 
 // ─────────────────────────────────────────────────────────
-// STUDY SESSION
+// STUDY SESSION (Activity tracking)
 // ─────────────────────────────────────────────────────────
 model StudySession {
   id           String       @id @default(uuid())
   userId       String       @map("user_id")
   guideId      String?      @map("guide_id")
   durationSecs Int          @default(0) @map("duration_secs")
-  activityType ActivityType @map("activity_type")
   startedAt    DateTime     @default(now()) @map("started_at")
   endedAt      DateTime?    @map("ended_at")
+  activityType ActivityType @map("activity_type")
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("study_sessions")
-}
-
-enum ActivityType {
-  reading
-  flashcards
-  quiz
-  notes
-  chat
 }
 
 // ─────────────────────────────────────────────────────────
@@ -281,4 +286,199 @@ model Message {
 enum MessageRole {
   user
   assistant
+}
+
+// ─────────────────────────────────────────────────────────
+// FLASHCARD REVIEW (SM-2 Spaced Repetition)
+// ─────────────────────────────────────────────────────────
+model FlashcardReview {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  cardId         String    @map("card_id")
+  easeFactor     Decimal   @default(2.50) @map("ease_factor") @db.Decimal(4, 2)
+  intervalDays   Int       @default(1) @map("interval_days")
+  repetitions    Int       @default(0)
+  nextReviewAt   DateTime  @map("next_review_at")
+  lastReviewedAt DateTime? @map("last_reviewed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@map("flashcard_reviews")
+}
+
+// ─────────────────────────────────────────────────────────
+// QUIZ ATTEMPT
+// ─────────────────────────────────────────────────────────
+model QuizAttempt {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  quizId         String   @map("quiz_id") // maps to guideId
+  score          Decimal  @db.Decimal(5, 2)
+  totalQuestions Int      @map("total_questions")
+  correct        Int
+  incorrect      Int
+  skipped        Int      @default(0)
+  timeTakenSec   Int?     @map("time_taken_sec")
+  attemptedAt    DateTime @default(now()) @map("attempted_at")
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide   Guide        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  results QuizResult[]
+
+  @@map("quiz_attempts")
+}
+
+// ─────────────────────────────────────────────────────────
+// QUIZ RESULT
+// ─────────────────────────────────────────────────────────
+model QuizResult {
+  id          String   @id @default(uuid())
+  attemptId   String   @map("attempt_id")
+  questionId  String   @map("question_id")
+  selectedOpt String?  @map("selected_opt")
+  writtenAns  String?  @db.Text @map("written_ans")
+  aiScore     Decimal? @map("ai_score") @db.Decimal(4, 2)
+  isCorrect   Boolean  @default(false) @map("is_correct")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("quiz_results")
+}
+
+// ─────────────────────────────────────────────────────────
+// PLANNER SESSION
+// ─────────────────────────────────────────────────────────
+model PlannerSession {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  guideId         String?       @map("guide_id")
+  topic           String?
+  scheduledAt     DateTime      @map("scheduled_at")
+  durationMinutes Int           @default(60) @map("duration_minutes")
+  type            PlannerType   @default(STUDY)
+  status          PlannerStatus @default(PENDING)
+  notes           String?       @db.Text
+  completedAt     DateTime?     @map("completed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@map("planner_sessions")
+}
+
+enum PlannerType {
+  STUDY
+  REVIEW
+  QUIZ
+  FLASHCARDS
+  DOUBT
+}
+
+enum PlannerStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+// ─────────────────────────────────────────────────────────
+// DOUBT SESSION
+// ─────────────────────────────────────────────────────────
+model DoubtSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  guideId   String?  @map("guide_id")
+  question  String   @db.Text
+  answer    String   @db.LongText
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@map("doubt_sessions")
+}
+
+// ─────────────────────────────────────────────────────────
+// CURATED RESOURCE
+// ─────────────────────────────────────────────────────────
+model Resource {
+  id       String       @id @default(uuid())
+  userId   String       @map("user_id")
+  guideId  String?      @map("guide_id")
+  title    String
+  url      String?      @db.Text
+  type     ResourceType @default(ARTICLE)
+  topic    String?
+  notes    String?      @db.Text
+  savedAt  DateTime     @default(now()) @map("saved_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guide Guide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+
+  @@map("resources")
+}
+
+enum ResourceType {
+  VIDEO
+  ARTICLE
+  PAPER
+  BOOK
+  COURSE
+  TOOL
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────
+// ACTIVITY LOG / HISTORY
+// ─────────────────────────────────────────────────────────
+model ActivityLog {
+  id          String          @id @default(uuid())
+  userId      String          @map("user_id")
+  guideId     String?         @map("guide_id")
+  type        ActivityLogType
+  description String?         @db.VarChar(500)
+  meta        Json?
+  occurredAt  DateTime        @default(now()) @map("occurred_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_log")
+}
+
+enum ActivityLogType {
+  QUIZ_ATTEMPT
+  FLASHCARD_REVIEW
+  DOUBT_ASKED
+  GUIDE_VIEWED
+  PLANNER_SESSION
+}
+
+// ─────────────────────────────────────────────────────────
+// GUIDE TOPIC (For coverage tracking)
+// ─────────────────────────────────────────────────────────
+model GuideTopic {
+  id      String @id @default(uuid())
+  guideId String @map("guide_id")
+  topic   String
+
+  guide Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@unique([guideId, topic])
+  @@map("guide_topics")
+}
+
+enum ActivityType {
+  reading
+  flashcards
+  quiz
+  notes
+  chat
+  doubt
+  planner
 }

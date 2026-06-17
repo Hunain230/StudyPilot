@@ -11,6 +11,7 @@ import flashcardRoutes from './routes/flashcard.routes';
 import quizRoutes from './routes/quiz.routes';
 import studyplanRoutes from './routes/studyplan.routes';
 import chatRoutes from './routes/chat.routes';
+import v1Router from './routes/v1';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/study-plan', studyplanRoutes);
 app.use('/api/chat',    chatRoutes);
+app.use('/api/v1',      v1Router);
 
 // ── Health Check ─────────────────────────────────
 app.get('/api/health', (_req, res) => {

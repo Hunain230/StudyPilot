@@ -6,6 +6,7 @@ import DashboardLayout from "./components/layout/DashboardLayout";
 import MyGuidesPage from "./pages/MyGuidesPage";
 import CreateGuidePage from "./pages/CreateGuidePage";
 import HistoryPage from "./pages/HistoryPage";
+import GuideDetailsPage from "./pages/GuideDetailsPage";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/guides" element={<MyGuidesPage />} />
           <Route path="/guides/new" element={<CreateGuidePage />} />
+          <Route path="/guides/:id" element={<GuideDetailsPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/resources" element={<MyGuidesPage />} />
           <Route path="/settings" element={<HistoryPage />} />

@@ -209,13 +209,13 @@ export default function MyGuidesPage() {
                     <span>Created {new Date(g.createdAt).toLocaleDateString()}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button 
-                      disabled={g.status === "processing"}
-                      className={`flex-1 ${isCompleted ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface opacity-50 cursor-not-allowed"} py-2.5 rounded-xl font-label text-label-md hover:brightness-110 transition-all flex items-center justify-center gap-2`}
+                    <Link 
+                      to={`/guides/${g.id}`}
+                      className={`flex-1 text-center ${isCompleted ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface opacity-50 cursor-not-allowed pointer-events-none"} py-2.5 rounded-xl font-label text-label-md hover:brightness-110 transition-all flex items-center justify-center gap-2`}
                     >
                       <span className="material-symbols-outlined text-base">play_arrow</span>
                       Study Guide
-                    </button>
+                    </Link>
                     <button className="p-2.5 border border-outline-variant rounded-xl hover:bg-white transition-all text-on-surface-variant" title="Export PDF">
                       <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
                     </button>

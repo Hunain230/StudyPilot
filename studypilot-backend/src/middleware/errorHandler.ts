@@ -34,11 +34,11 @@ export const errorHandler = (
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({
       success: false,
-      error: `File too large. Maximum size is ${ENV.MAX_FILE_SIZE_MB}MB.`,
-      message: `File too large. Maximum size is ${ENV.MAX_FILE_SIZE_MB}MB.`,
-      code: 'FILE_TOO_LARGE',
-      statusCode: 413,
-      data: null,
+      error: {
+        code: 'FILE_TOO_LARGE',
+        message: `File too large. Maximum size is ${ENV.MAX_FILE_SIZE_MB}MB.`,
+        statusCode: 413,
+      },
     });
   }
 
@@ -46,11 +46,11 @@ export const errorHandler = (
   if (err.message?.includes('Only PDF') || err.message?.includes('invalid file type')) {
     return res.status(400).json({
       success: false,
-      error: err.message,
-      message: err.message,
-      code: 'INVALID_FILE_TYPE',
-      statusCode: 400,
-      data: null,
+      error: {
+        code: 'INVALID_FILE_TYPE',
+        message: err.message,
+        statusCode: 400,
+      },
     });
   }
 
@@ -58,33 +58,33 @@ export const errorHandler = (
   if (err.message?.includes('empty or contains only images') || err.message?.includes('PDF appears to be empty')) {
     return res.status(422).json({
       success: false,
-      error: err.message,
-      message: err.message,
-      code: 'PDF_EMPTY',
-      statusCode: 422,
-      data: null,
+      error: {
+        code: 'PDF_EMPTY',
+        message: err.message,
+        statusCode: 422,
+      },
     });
   }
 
   if (err.message?.includes('No transcript available') || err.message?.includes('transcript is too short')) {
     return res.status(422).json({
       success: false,
-      error: err.message,
-      message: err.message,
-      code: 'TRANSCRIPT_UNAVAILABLE',
-      statusCode: 422,
-      data: null,
+      error: {
+        code: 'TRANSCRIPT_UNAVAILABLE',
+        message: err.message,
+        statusCode: 422,
+      },
     });
   }
 
   if (err.message?.includes('Invalid YouTube URL')) {
     return res.status(400).json({
       success: false,
-      error: err.message,
-      message: err.message,
-      code: 'INVALID_YOUTUBE_URL',
-      statusCode: 400,
-      data: null,
+      error: {
+        code: 'INVALID_YOUTUBE_URL',
+        message: err.message,
+        statusCode: 400,
+      },
     });
   }
 
@@ -92,22 +92,22 @@ export const errorHandler = (
   if (err.status === 429 || err.message?.toLowerCase().includes('rate limit') || err.code === 'RATE_LIMITED') {
     return res.status(429).json({
       success: false,
-      error: 'AI service is temporarily busy. Please wait a moment and try again.',
-      message: 'AI service is temporarily busy. Please wait a moment and try again.',
-      code: 'RATE_LIMITED',
-      statusCode: 429,
-      data: null,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'AI service is temporarily busy. Please wait a moment and try again.',
+        statusCode: 429,
+      },
     });
   }
 
   if (err.status >= 500 && (err.message?.toLowerCase().includes('groq') || err.message?.toLowerCase().includes('ai'))) {
     return res.status(503).json({
       success: false,
-      error: 'AI service is temporarily unavailable. Please try again in a few minutes.',
-      message: 'AI service is temporarily unavailable. Please try again in a few minutes.',
-      code: 'AI_UNAVAILABLE',
-      statusCode: 503,
-      data: null,
+      error: {
+        code: 'AI_UNAVAILABLE',
+        message: 'AI service is temporarily unavailable. Please try again in a few minutes.',
+        statusCode: 503,
+      },
     });
   }
 
@@ -115,22 +115,35 @@ export const errorHandler = (
   if (err.code === 'P2002') {
     return res.status(409).json({
       success: false,
-      error: 'A guide from this source already exists.',
-      message: 'A guide from this source already exists.',
-      code: 'DUPLICATE_GUIDE',
-      statusCode: 409,
-      data: null,
+      error: {
+        code: 'DUPLICATE_GUIDE',
+        message: 'A guide from this source already exists.',
+        statusCode: 409,
+      },
     });
   }
 
   if (err.code === 'P2025') {
     return res.status(404).json({
       success: false,
-      error: 'Record not found.',
-      message: 'Record not found.',
-      code: 'GUIDE_NOT_FOUND',
-      statusCode: 404,
-      data: null,
+      error: {
+        code: 'GUIDE_NOT_FOUND',
+        message: 'Record not found.',
+        statusCode: 404,
+      },
+    });
+  }
+
+  // Zod Validation Errors
+  if (err.name === 'ZodError') {
+    const message = err.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message,
+        statusCode: 400,
+      },
     });
   }
 
@@ -138,11 +151,11 @@ export const errorHandler = (
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
-      error: err.message,
-      message: err.message,
-      code: err.code || 'APP_ERROR',
-      statusCode: err.statusCode,
-      data: null,
+      error: {
+        code: err.code || 'APP_ERROR',
+        message: err.message,
+        statusCode: err.statusCode,
+      },
     });
   }
 
@@ -150,11 +163,11 @@ export const errorHandler = (
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
       success: false,
-      error: 'Invalid token',
-      message: 'Invalid token',
-      code: 'UNAUTHORIZED',
-      statusCode: 401,
-      data: null,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Invalid token',
+        statusCode: 401,
+      },
     });
   }
 
@@ -166,10 +179,10 @@ export const errorHandler = (
 
   return res.status(statusCode).json({
     success: false,
-    error: message,
-    message,
-    code: 'INTERNAL_ERROR',
-    statusCode,
-    data: null,
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message,
+      statusCode,
+    },
   });
 };

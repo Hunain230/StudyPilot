@@ -65,6 +65,12 @@ export const getGuides = async (req: Request, res: Response, next: NextFunction)
             metadata: true,
           },
         },
+        _count: {
+          select: {
+            flashcards: true,
+            quizQuestions: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     };
