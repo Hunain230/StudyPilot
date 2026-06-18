@@ -15,11 +15,11 @@ export default function LoginPage() {
     setError(null);
     try {
       await authService.login(email, password);
-      navigate("/guides");
+      navigate("/dashboard");
     } catch (err: any) {
       console.error(err);
       setError(
-        err.response?.data?.message || "Invalid email or password. Please try again."
+        err.response?.data?.error?.message || err.response?.data?.message || "Invalid email or password. Please try again."
       );
     } finally {
       setLoading(false);

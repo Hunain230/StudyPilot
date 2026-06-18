@@ -18,11 +18,11 @@ export default function SignUpPage() {
     setError(null);
     try {
       await authService.signup(name, email, password);
-      navigate("/guides");
+      navigate("/dashboard");
     } catch (err: any) {
       console.error(err);
       setError(
-        err.response?.data?.message || "Registration failed. Please try again."
+        err.response?.data?.error?.message || err.response?.data?.message || "Registration failed. Please try again."
       );
     } finally {
       setLoading(false);

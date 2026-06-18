@@ -98,7 +98,7 @@ export default function CreateGuidePage() {
 
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.message || "Failed to create study guide. Please try again.");
+      setError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to create study guide. Please try again.");
       setGenerating(false);
     }
   };

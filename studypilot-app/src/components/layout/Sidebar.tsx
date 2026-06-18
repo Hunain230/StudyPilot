@@ -3,7 +3,7 @@ import type { UserProfile } from "./DashboardLayout";
 import { authService } from "../../services/auth.service";
 
 const navItems = [
-  { label: "Dashboard", icon: "dashboard", href: "/guides" },
+  { label: "Dashboard", icon: "dashboard", href: "/dashboard" },
   { label: "My Guides", icon: "auto_stories", href: "/guides" },
   { label: "New Guide", icon: "add_circle", href: "/guides/new" },
   { label: "Resources", icon: "library_books", href: "/resources" },
@@ -51,9 +51,7 @@ export default function Sidebar({ user }: SidebarProps) {
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.href ||
-            (item.href === "/guides" && location.pathname === "/guides") ||
-            (item.href === "/guides/new" && location.pathname === "/guides/new") ||
-            (item.href === "/history" && location.pathname === "/history");
+            (item.href === "/guides" && location.pathname.startsWith("/guides") && location.pathname !== "/guides/new");
 
           return (
             <Link
@@ -109,7 +107,7 @@ export default function Sidebar({ user }: SidebarProps) {
                 onClick={handleLogout}
                 className="flex items-center gap-1 text-body-sm text-on-surface-variant hover:text-primary transition-colors font-body"
               >
-                <span className="material-symbols-outlined text-sm font-body">logout</span>
+                <span className="material-symbols-outlined text-sm">logout</span>
                 Log out
               </a>
             </div>
