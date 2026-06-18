@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import type { UserProfile } from "./DashboardLayout";
 
 interface TopBarProps {
@@ -6,6 +7,22 @@ interface TopBarProps {
 }
 
 export default function TopBar({ user }: TopBarProps) {
+  const [isDark, setIsDark] = useState(() => {
+    return document.documentElement.classList.contains("dark");
+  });
+
+  const toggleTheme = () => {
+    if (isDark) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+      setIsDark(true);
+    }
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -16,7 +33,7 @@ export default function TopBar({ user }: TopBarProps) {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-[280px] h-16 bg-white/70 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-gutter z-40">
+    <header className="fixed top-0 right-0 left-[280px] h-16 bg-surface-container-lowest/70 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-gutter z-40 transition-colors">
       {/* Search */}
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <div className="relative w-full">
@@ -47,8 +64,15 @@ export default function TopBar({ user }: TopBarProps) {
           <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95">
             <span className="material-symbols-outlined">notifications</span>
           </button>
-          <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95">
-            <span className="material-symbols-outlined">help</span>
+          <button
+            onClick={toggleTheme}
+            className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95"
+            aria-label="Toggle Theme"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            <span className="material-symbols-outlined">
+              {isDark ? "light_mode" : "dark_mode"}
+            </span>
           </button>
           <Link to="/guides" className="w-10 h-10 rounded-full border-2 border-primary-fixed overflow-hidden block">
             {user.avatarUrl ? (

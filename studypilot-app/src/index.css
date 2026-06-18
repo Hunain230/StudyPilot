@@ -8,6 +8,120 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-primary: 0 74 198;
+  --color-primary-container: 37 99 235;
+  --color-primary-fixed: 219 225 255;
+  --color-primary-fixed-dim: 180 197 255;
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 238 239 255;
+  --color-on-primary-fixed: 0 23 75;
+  --color-on-primary-fixed-variant: 0 62 168;
+  --color-inverse-primary: 180 197 255;
+
+  --color-secondary: 113 42 226;
+  --color-secondary-container: 138 76 252;
+  --color-secondary-fixed: 234 221 255;
+  --color-secondary-fixed-dim: 210 187 255;
+  --color-on-secondary: 255 255 255;
+  --color-on-secondary-container: 255 251 255;
+  --color-on-secondary-fixed: 37 0 90;
+  --color-on-secondary-fixed-variant: 90 0 198;
+
+  --color-tertiary: 120 75 0;
+  --color-tertiary-container: 153 97 0;
+  --color-tertiary-fixed: 255 221 184;
+  --color-tertiary-fixed-dim: 255 185 95;
+  --color-on-tertiary: 255 255 255;
+  --color-on-tertiary-container: 255 238 221;
+  --color-on-tertiary-fixed: 42 23 0;
+  --color-on-tertiary-fixed-variant: 101 62 0;
+
+  --color-error: 186 26 26;
+  --color-error-container: 255 218 214;
+  --color-on-error: 255 255 255;
+  --color-on-error-container: 147 0 10;
+
+  --color-surface: 248 249 255;
+  --color-surface-dim: 203 219 245;
+  --color-surface-bright: 248 249 255;
+  --color-surface-container-lowest: 255 255 255;
+  --color-surface-container-low: 239 244 255;
+  --color-surface-container: 229 238 255;
+  --color-surface-container-high: 220 233 255;
+  --color-surface-container-highest: 211 228 254;
+  --color-surface-variant: 211 228 254;
+  --color-surface-tint: 0 83 219;
+
+  --color-on-surface: 11 28 48;
+  --color-on-surface-variant: 67 70 85;
+  --color-on-background: 11 28 48;
+  --color-background: 248 249 255;
+
+  --color-outline: 115 118 134;
+  --color-outline-variant: 195 198 215;
+
+  --color-inverse-surface: 33 49 69;
+  --color-inverse-on-surface: 234 241 255;
+}
+
+.dark {
+  --color-primary: 59 130 246;
+  --color-primary-container: 37 99 235;
+  --color-primary-fixed: 27 46 85;
+  --color-primary-fixed-dim: 44 70 122;
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 238 239 255;
+  --color-on-primary-fixed: 234 241 255;
+  --color-on-primary-fixed-variant: 180 197 255;
+  --color-inverse-primary: 59 130 246;
+
+  --color-secondary: 168 85 247;
+  --color-secondary-container: 138 76 252;
+  --color-secondary-fixed: 50 22 90;
+  --color-secondary-fixed-dim: 75 40 122;
+  --color-on-secondary: 255 255 255;
+  --color-on-secondary-container: 255 251 255;
+  --color-on-secondary-fixed: 243 232 255;
+  --color-on-secondary-fixed-variant: 210 187 255;
+
+  --color-tertiary: 245 158 11;
+  --color-tertiary-container: 153 97 0;
+  --color-tertiary-fixed: 67 40 0;
+  --color-tertiary-fixed-dim: 101 62 0;
+  --color-on-tertiary: 255 255 255;
+  --color-on-tertiary-container: 255 238 221;
+  --color-on-tertiary-fixed: 42 23 0;
+  --color-on-tertiary-fixed-variant: 101 62 0;
+
+  --color-error: 239 68 68;
+  --color-error-container: 147 0 10;
+  --color-on-error: 255 255 255;
+  --color-on-error-container: 255 218 214;
+
+  --color-surface: 15 16 21;
+  --color-surface-dim: 27 28 36;
+  --color-surface-bright: 27 28 36;
+  --color-surface-container-lowest: 11 12 15;
+  --color-surface-container-low: 20 21 26;
+  --color-surface-container: 26 28 34;
+  --color-surface-container-high: 34 36 44;
+  --color-surface-container-highest: 42 44 54;
+  --color-surface-variant: 42 44 54;
+  --color-surface-tint: 59 130 246;
+
+  --color-on-surface: 226 226 233;
+  --color-on-surface-variant: 195 198 215;
+  --color-on-background: 226 226 233;
+  --color-background: 13 14 18;
+
+  --color-outline: 142 145 159;
+  --color-outline-variant: 67 70 85;
+
+  --color-inverse-surface: 234 241 255;
+  --color-inverse-on-surface: 11 28 48;
+}
+
 /* ===== Base Styles ===== */
 @layer base {
   html {
@@ -16,16 +130,17 @@
 
   body {
     font-family: 'Inter', sans-serif;
-    color: #0b1c30;
-    background-color: #f8f9ff;
+    color: rgb(var(--color-on-surface));
+    background-color: rgb(var(--color-background));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   ::selection {
-    background-color: #dbe1ff;
-    color: #004ac6;
+    background-color: rgb(var(--color-primary-fixed));
+    color: rgb(var(--color-primary));
   }
 
   .material-symbols-outlined {
@@ -170,3 +285,67 @@
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* ===== Dark Mode Theme Overrides ===== */
+.dark .glass-card {
+  background: rgba(26, 28, 34, 0.7);
+  border-color: rgba(67, 70, 85, 0.3);
+}
+
+.dark .glass-card-hover:hover {
+  background: rgba(34, 36, 44, 0.8);
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 12px 24px -10px rgba(59, 130, 246, 0.15);
+}
+
+/* Sidebar active indicator override for dark mode */
+.dark .sidebar-active::after {
+  background-color: rgb(var(--color-primary));
+}
+
+/* Scrollbar dark mode */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-outline-variant));
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-outline));
+}
+
+/* Dynamic CSS Overrides for Tailwind classes with hardcoded light-mode values */
+.dark input, 
+.dark select, 
+.dark textarea {
+  color: rgb(var(--color-on-surface)) !important;
+}
+
+.dark select option {
+  background-color: rgb(var(--color-surface-container)) !important;
+  color: rgb(var(--color-on-surface)) !important;
+}
+
+/* Match Tailwind hex colors and map to variable-driven dark theme values */
+.dark [class*="bg-[#F1F5F9]"],
+.dark [class*="bg-[#f1f5f9]"] {
+  background-color: rgb(var(--color-surface-container-low)) !important;
+}
+
+.dark [class*="focus:bg-white"]:focus {
+  background-color: rgb(var(--color-surface-container-lowest)) !important;
+}
+
+.dark [class*="bg-white/40"] {
+  background-color: rgba(11, 12, 15, 0.4) !important;
+}
+
+.dark [class*="bg-white/70"] {
+  background-color: rgba(11, 12, 15, 0.7) !important;
+}
+
+.dark [class*="hover:bg-slate-50"]:hover {
+  background-color: rgb(var(--color-surface-container-low)) !important;
+}
+
+.dark [class*="bg-slate-100"] {
+  background-color: rgb(var(--color-surface-container-low)) !important;
+}
+
