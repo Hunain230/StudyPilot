@@ -4,9 +4,11 @@ import { analyticsService } from "../services/analytics.service";
 import type { OverviewStats, QuizTrendData, WeakTopicItem, ScorePrediction } from "../services/analytics.service";
 import { guideService } from "../services/guide.service";
 import type { UserProfile } from "../components/layout/DashboardLayout";
+import { useStreak } from "../hooks/useStreak";
 
 export default function DashboardPage() {
   const { user } = useOutletContext<{ user: UserProfile }>();
+  const streak = useStreak();
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [quizTrend, setQuizTrend] = useState<QuizTrendData | null>(null);
   const [weakTopics, setWeakTopics] = useState<WeakTopicItem[]>([]);
@@ -230,10 +232,10 @@ export default function DashboardPage() {
           {
             icon: "local_fire_department",
             label: "Study Streak",
-            value: `${overview?.currentStudyStreak || 0} Days`,
+            value: `${streak.current} Day${streak.current === 1 ? "" : "s"}`,
             iconBg: "bg-error/10",
             iconColor: "text-error",
-            desc: `Longest streak: ${overview?.longestStreak || 0} days`
+            desc: `Longest streak: ${streak.longest} day${streak.longest === 1 ? "" : "s"}`
           }
         ].map(card => (
           <div key={card.label} className="glass-card p-6 rounded-3xl flex flex-col justify-between hover:translate-y-[-2px] transition-transform">

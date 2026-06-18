@@ -58,10 +58,10 @@ export default function Sidebar({ user }: SidebarProps) {
             <Link
               key={item.label}
               to={item.href}
-              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-colors font-label text-label-md ${
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-label text-label-md ${
                 isActive
-                  ? "text-primary font-bold bg-surface-container-low sidebar-active"
-                  : "text-on-surface-variant hover:bg-primary/5"
+                  ? "text-on-surface font-bold bg-surface-container-high/80 border border-outline-variant/15 shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-primary/5"
               }`}
             >
               <span

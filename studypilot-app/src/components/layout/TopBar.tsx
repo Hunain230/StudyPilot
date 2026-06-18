@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import type { UserProfile } from "./DashboardLayout";
+import NotificationPanel from "./NotificationPanel";
+import { useStreak } from "../../hooks/useStreak";
 
 interface TopBarProps {
   user: UserProfile;
 }
 
 export default function TopBar({ user }: TopBarProps) {
+  const streak = useStreak();
   const [isDark, setIsDark] = useState(() => {
     return document.documentElement.classList.contains("dark");
   });
@@ -49,21 +52,25 @@ export default function TopBar({ user }: TopBarProps) {
       {/* Right Section */}
       <div className="flex items-center gap-6">
         {/* Streak Badge */}
-        <div className="flex items-center gap-2 bg-secondary-fixed/30 px-3 py-1.5 rounded-full border border-secondary-fixed">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${
+          streak.current > 0
+            ? "bg-secondary-fixed/30 border-secondary-fixed text-secondary"
+            : "bg-surface-container-low border-outline-variant/30 text-on-surface-variant/40"
+        }`} title={streak.current > 0 ? `${streak.current} days study streak!` : "Start a streak by studying today!"}>
           <span
-            className="material-symbols-outlined text-secondary font-bold text-lg"
-            style={{ fontVariationSettings: "'FILL' 1" }}
+            className={`material-symbols-outlined font-bold text-lg ${streak.current > 0 ? "text-secondary" : "text-on-surface-variant/40"}`}
+            style={{ fontVariationSettings: streak.current > 0 ? "'FILL' 1" : "'FILL' 0" }}
           >
             local_fire_department
           </span>
-          <span className="text-label-md font-bold text-secondary font-label">1 Day Streak</span>
+          <span className={`text-label-md font-bold font-label ${streak.current > 0 ? "text-secondary" : "text-on-surface-variant/60"}`}>
+            {streak.current} Day{streak.current === 1 ? "" : "s"} Streak
+          </span>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
+          <NotificationPanel />
           <button
             onClick={toggleTheme}
             className="p-2 text-on-surface-variant hover:bg-primary/5 rounded-full transition-colors active:scale-95"

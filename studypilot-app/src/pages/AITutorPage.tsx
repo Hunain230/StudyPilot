@@ -4,6 +4,8 @@ import { useOutletContext } from "react-router-dom";
 import type { UserProfile } from "../components/layout/DashboardLayout";
 import { guideService } from "../services/guide.service";
 import { tutorService } from "../services/tutor.service";
+import { notificationService } from "../services/notification.service";
+import { streakService } from "../services/streak.service";
 import type {
   TutorAskMode,
   TutorHistoryMessage,
@@ -486,10 +488,10 @@ function HistoryItem({ item, active, onSelect, pinned, onPin }: { item: HistoryC
   const [hover, setHover] = useState(false);
   return (
     <div
-      className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
+      className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 border ${
         active
-          ? "bg-primary/10 text-primary"
-          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
+          ? "bg-surface-container-high/80 text-on-surface border-outline-variant/15 shadow-sm"
+          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low border-transparent"
       }`}
       onClick={() => onSelect(item.id)}
       onMouseEnter={() => setHover(true)}
@@ -497,7 +499,7 @@ function HistoryItem({ item, active, onSelect, pinned, onPin }: { item: HistoryC
     >
       {/* Left icon */}
       <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-        active ? "bg-primary/15" : "bg-surface-container group-hover:bg-surface-container-high"
+        active ? "bg-surface-container-highest" : "bg-surface-container group-hover:bg-surface-container-high"
       }`}>
         <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
           {pinned ? "push_pin" : "chat"}
@@ -743,9 +745,20 @@ export default function AITutorPage() {
     setQuestion(""); setSending(true); setError(null);
 
     try {
+      streakService.recordActivity();
       const res = await tutorService.askTutor({ question: trimmed, guideId: selectedGuideId || null, mode: searchMode });
       const aiMsg: ChatMessage = { id: `a-${Date.now()}`, role: "assistant", content: res.answer, createdAt: new Date().toISOString(), sources: res.sources, mode: res.mode };
       setMessages((p) => [...p, aiMsg]);
+
+      // Push a notification so user knows the answer is ready (useful if they've switched tabs)
+      const preview = res.answer.replace(/#+\s*/g, "").replace(/\n/g, " ").slice(0, 80);
+      notificationService.push({
+        type: "ai_response",
+        title: "AI Tutor answered",
+        body: preview + (res.answer.length > 80 ? "…" : ""),
+        link: "/ai-tutor",
+        icon: "psychology",
+      });
     } catch (err: any) {
       setError(err.response?.data?.error?.message || "AI Tutor could not answer right now.");
       setMessages((p) => p.filter((m) => m.id !== userMsg.id));
@@ -777,7 +790,7 @@ export default function AITutorPage() {
   return (
     <>
       {/* ── Global styles injected via className + index.css sp- classes ── */}
-      <div className="sp-workspace">
+      <div className={`sp-workspace ${isMaximized ? "sp-workspace-maximized" : ""}`}>
 
         {/* ── Chat History Sidebar ── */}
         <ChatHistorySidebar
