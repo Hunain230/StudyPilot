@@ -1,6 +1,7 @@
 import { api } from '../lib/axios';
 
-export type TutorMode = 'web' | 'web_with_guide';
+export type TutorAskMode = 'simple' | 'web';
+export type TutorMode = 'simple' | 'simple_with_guide' | 'web' | 'web_with_guide';
 
 export interface TutorSource {
   title: string;
@@ -23,10 +24,11 @@ export interface TutorHistoryMessage {
 }
 
 export const tutorService = {
-  async askTutor(payload: { question: string; guideId?: string | null }): Promise<TutorAskResponse> {
+  async askTutor(payload: { question: string; guideId?: string | null; mode?: TutorAskMode }): Promise<TutorAskResponse> {
     const { data } = await api.post('/v1/tutor/ask', {
       question: payload.question,
       guideId: payload.guideId || null,
+      mode: payload.mode || 'web',
     });
     return data.data;
   },

@@ -19,6 +19,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -49,13 +50,13 @@ export default function DashboardLayout() {
 
   return (
     <div className="bg-background font-body text-on-surface flex min-h-screen">
-      <Sidebar user={user} />
-      <main className="flex-1 ml-[280px] relative min-h-screen">
+      {!isMaximized && <Sidebar user={user} />}
+      <main className={`flex-1 relative min-h-screen ${isMaximized ? "ml-0" : "ml-[280px]"}`}>
         {/* Background Gradient */}
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(113,42,226,0.08),transparent),radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.08),transparent)] bg-surface" />
-        <TopBar user={user} />
-        <div className="pt-24 pb-12 px-margin-desktop max-w-container-max mx-auto">
-          <Outlet context={{ user }} />
+        {!isMaximized && <TopBar user={user} />}
+        <div className={isMaximized ? "h-screen" : "pt-24 pb-12 px-margin-desktop max-w-container-max mx-auto"}>
+          <Outlet context={{ user, setUser, isMaximized, setIsMaximized }} />
         </div>
       </main>
     </div>

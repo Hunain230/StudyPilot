@@ -66,10 +66,35 @@ ${params.question}
 Answer now.`;
 }
 
+function buildSimpleTutorPrompt(params: {
+  question: string;
+  guideChunks: string[];
+  guideTitle?: string;
+}) {
+  const guideContext = buildGuideContext(params.guideChunks, params.guideTitle);
+
+  return `You are StudyPilot AI Tutor, a friendly academic tutor for students.
+
+Your job:
+- Answer the student's question clearly using your general knowledge.
+- Use SELECTED GUIDE CONTEXT when it is relevant, but do not claim live web access or current search results.
+- If the question asks for recent, changing, or time-sensitive facts, say that Simple Mode may not be current and suggest Web Mode for verification.
+- Use examples, short steps, and concise Markdown.
+- For programming questions, include clean code blocks when useful.
+
+SELECTED GUIDE CONTEXT:
+${guideContext}
+
+STUDENT QUESTION:
+${params.question}
+
+Answer now.`;
+}
+
 export async function askTutor(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.userId;
-    const { question, guideId } = tutorAskSchema.parse(req.body);
+    const { question, guideId, mode = 'web' } = tutorAskSchema.parse(req.body);
 
     let guideTitle: string | undefined;
     let guideChunks: string[] = [];
@@ -101,18 +126,24 @@ export async function askTutor(req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    const webResults = await searchWeb(question);
+    const webResults = mode === 'web' ? await searchWeb(question) : [];
 
-    if (webResults.length === 0) {
+    if (mode === 'web' && webResults.length === 0) {
       throw new AppError('Live web search did not return useful results. Please try a more specific question.', 502, 'WEB_SEARCH_EMPTY');
     }
 
-    const prompt = buildTutorPrompt({
-      question,
-      webResults,
-      guideChunks,
-      guideTitle,
-    });
+    const prompt = mode === 'simple'
+      ? buildSimpleTutorPrompt({
+        question,
+        guideChunks,
+        guideTitle,
+      })
+      : buildTutorPrompt({
+        question,
+        webResults,
+        guideChunks,
+        guideTitle,
+      });
 
     const result = await groq.chat.completions.create({
       model: ENV.GROQ_MODEL || 'llama-3.1-8b-instant',
@@ -122,7 +153,9 @@ export async function askTutor(req: Request, res: Response, next: NextFunction) 
     });
 
     const answer = result.choices[0]?.message?.content || 'Sorry, I could not generate an answer at this moment.';
-    const mode = guideId && guideChunks.length > 0 ? 'web_with_guide' : 'web';
+    const responseMode = mode === 'simple'
+      ? (guideId && guideChunks.length > 0 ? 'simple_with_guide' : 'simple')
+      : (guideId && guideChunks.length > 0 ? 'web_with_guide' : 'web');
     const sources: TutorSource[] = [
       ...webResults.map((source) => ({
         title: source.title,
@@ -157,7 +190,7 @@ export async function askTutor(req: Request, res: Response, next: NextFunction) 
         guideId: guideId || null,
         type: 'DOUBT_ASKED',
         description: `Asked AI Tutor: "${question.substring(0, 60)}${question.length > 60 ? '...' : ''}"`,
-        meta: { mode, sources: sources.slice(0, 5) },
+        meta: { mode: responseMode, sources: sources.slice(0, 5) },
       },
     });
 
@@ -174,7 +207,7 @@ export async function askTutor(req: Request, res: Response, next: NextFunction) 
       success: true,
       data: {
         answer,
-        mode,
+        mode: responseMode,
         sources,
       },
     });

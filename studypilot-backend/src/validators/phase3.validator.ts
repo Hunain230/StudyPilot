@@ -23,6 +23,7 @@ export const doubtSchema = z.object({
 export const tutorAskSchema = z.object({
   question: z.string().min(3).max(1000),
   guideId: z.string().uuid().optional().nullable(),
+  mode: z.enum(['simple', 'web']).optional(),
 });
 
 export const plannerSchema = z.object({

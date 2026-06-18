@@ -158,6 +158,17 @@
     background: #cbd5e1;
     border-radius: 10px;
   }
+
+  /* Kill browser-native focus outlines globally for composed inputs */
+  textarea:focus,
+  textarea:focus-visible,
+  input:focus,
+  input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: none !important;
+    --tw-ring-color: transparent !important;
+  }
 }
 
 /* ===== Component Utilities ===== */
@@ -286,6 +297,21 @@
   100% { background-position: 0% 50%; }
 }
 
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-in {
+  animation: fade-in-up 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ===== Dark Mode Theme Overrides ===== */
 .dark .glass-card {
   background: rgba(26, 28, 34, 0.7);
@@ -349,3 +375,444 @@
   background-color: rgb(var(--color-surface-container-low)) !important;
 }
 
+/* ══════════════════════════════════════════════════
+   StudyPilot AI Tutor — Premium Workspace (sp-*)
+══════════════════════════════════════════════════ */
+
+/* ── Keyframes ── */
+@keyframes sp-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
+@keyframes sp-msg-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sp-slide-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes sp-dropdown-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Root workspace ── */
+.sp-workspace {
+  display: flex;
+  /* pt-24 (96px top) + pb-12 (48px bottom) = 144px taken by layout padding */
+  height: calc(100vh - 144px);
+  max-height: calc(100vh - 144px);
+  overflow: hidden;
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.1);
+  background: rgb(var(--color-surface-container-lowest) / 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Main column ── */
+.sp-main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+/* ── Header ── */
+.sp-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgb(var(--color-outline-variant) / 0.15);
+  background: rgb(var(--color-background) / 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  gap: 12px;
+}
+
+.sp-header-divider {
+  width: 1px;
+  height: 20px;
+  background: rgb(var(--color-outline-variant) / 0.25);
+}
+
+/* ── Glass buttons ── */
+.sp-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  background: rgb(var(--color-surface-container-low) / 0.6);
+  backdrop-filter: blur(8px);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(var(--color-on-surface-variant));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sp-glass-btn:hover {
+  background: rgb(var(--color-surface-container));
+  color: rgb(var(--color-on-surface));
+  border-color: rgb(var(--color-outline-variant) / 0.4);
+}
+
+/* ── Icon button ── */
+.sp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--color-on-surface-variant));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sp-icon-btn:hover {
+  background: rgb(var(--color-surface-container));
+  color: rgb(var(--color-on-surface));
+}
+
+/* ── History Sidebar ── */
+.sp-history-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 272px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: rgb(var(--color-surface-container-lowest));
+  border-right: 1px solid rgb(var(--color-outline-variant) / 0.12);
+  box-shadow: 8px 0 40px rgba(0,0,0,0.18);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* history sidebar header gradient stripe */
+.sp-history-sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #2563EB, #7C3AED);
+  z-index: 1;
+}
+
+/* ── Session Panel ── */
+.sp-session-panel {
+  width: 256px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-left: 1px solid rgb(var(--color-outline-variant) / 0.1);
+  background: rgb(var(--color-surface-container-lowest));
+  position: relative;
+  border-radius: 0 16px 16px 0;
+  animation: sp-slide-in 0.25s ease both;
+}
+
+.sp-session-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #7C3AED, #2563EB);
+}
+
+/* ── Messages area ── */
+.sp-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* ── Empty state ── */
+.sp-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 16px 24px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* ── Conversation list ── */
+.sp-convo-list {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Message row ── */
+.sp-msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: sp-msg-in 0.25s ease both;
+}
+
+/* ── AI Avatar ── */
+.sp-ai-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgb(var(--color-primary) / 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border: 1px solid rgb(var(--color-primary) / 0.15);
+}
+
+/* ── Bubbles ── */
+.sp-bubble {
+  border-radius: 20px;
+  padding: 14px 18px;
+  position: relative;
+}
+
+.sp-bubble-user {
+  background: linear-gradient(135deg, #2563EB 0%, #4F46E5 60%, #7C3AED 100%);
+  color: #fff;
+  border-radius: 20px 20px 6px 20px;
+  max-width: 72%;
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+}
+
+.sp-bubble-ai {
+  background: rgb(var(--color-surface-container-low) / 0.7);
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  border-radius: 6px 20px 20px 20px;
+  max-width: min(680px, 90%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Message hover actions ── */
+.sp-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.12);
+  transition: opacity 0.15s ease;
+}
+
+.sp-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--color-on-surface-variant) / 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sp-action-btn:hover {
+  background: rgb(var(--color-surface-container));
+  color: rgb(var(--color-on-surface));
+}
+
+/* ── Composer wrap ── */
+.sp-composer-wrap {
+  flex-shrink: 0;
+  padding: 8px 16px 12px;
+}
+
+/* ── Composer ── */
+.sp-composer {
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.15);
+  background: rgb(var(--color-surface-container-low) / 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  padding: 14px 16px 10px;
+  transition: box-shadow 0.2s ease;
+}
+/* No focus-within border change — intentionally invisible */
+
+/* ── Composer textarea ── */
+.sp-composer-input {
+  width: 100%;
+  resize: none;
+  background: transparent;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgb(var(--color-on-surface));
+  font-family: inherit;
+}
+.sp-composer-input::placeholder {
+  color: rgb(var(--color-on-surface-variant) / 0.4);
+}
+.sp-composer-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* ── Send button ── */
+.sp-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
+  flex-shrink: 0;
+}
+.sp-send-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+}
+.sp-send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.sp-send-btn:disabled {
+  background: rgb(var(--color-surface-container-high));
+  color: rgb(var(--color-on-surface-variant) / 0.4);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ── Pill button (mode, guide) ── */
+.sp-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(var(--color-on-surface-variant));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.sp-pill-btn:hover {
+  background: rgb(var(--color-surface-container));
+  color: rgb(var(--color-on-surface));
+}
+
+/* ── Dropdown ── */
+.sp-dropdown {
+  background: rgb(var(--color-surface-container-lowest) / 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  border-radius: 18px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06);
+  overflow: hidden;
+  z-index: 50;
+  animation: sp-dropdown-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  padding: 6px;
+}
+
+/* ── Action chips ── */
+.sp-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 50px;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  background: rgb(var(--color-surface-container-low) / 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(var(--color-on-surface-variant));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.sp-action-chip:hover:not(:disabled) {
+  background: rgb(var(--color-primary) / 0.1);
+  color: rgb(var(--color-primary));
+  border-color: rgb(var(--color-primary) / 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.sp-action-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Code block dark card ── */
+.sp-code-block {
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── AI content typography ── */
+.sp-ai-content p { line-height: 1.75; }
+.sp-ai-content ul, .sp-ai-content ol { padding-left: 20px; }
+.sp-ai-content li { margin-bottom: 4px; line-height: 1.7; }
+.sp-ai-content h4 { margin-top: 14px; margin-bottom: 6px; }
+.sp-ai-content strong { font-weight: 600; }
+
+/* ── Scrollbar ── */
+.sp-messages-area::-webkit-scrollbar,
+.sp-history-sidebar::-webkit-scrollbar,
+.sp-session-panel::-webkit-scrollbar { width: 4px; }
+.sp-messages-area::-webkit-scrollbar-thumb,
+.sp-history-sidebar::-webkit-scrollbar-thumb,
+.sp-session-panel::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-outline-variant) / 0.3);
+  border-radius: 8px;
+}
+
+/* ── No scrollbar utility ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .sp-session-panel { display: none; }
+}
+
+@media (max-width: 640px) {
+  .sp-convo-list { padding: 20px 12px 16px; }
+  .sp-composer-wrap { padding: 8px 12px 14px; }
+  .sp-header { padding: 10px 14px; }
+}
