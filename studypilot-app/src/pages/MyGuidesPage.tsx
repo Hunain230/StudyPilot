@@ -21,6 +21,8 @@ export default function MyGuidesPage() {
   const [guidesList, setGuidesList] = useState<GuideListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState("All Subjects");
+  const [selectedSort, setSelectedSort] = useState("Sort: Newest");
 
   useEffect(() => {
     const fetchGuides = async () => {
@@ -69,7 +71,38 @@ export default function MyGuidesPage() {
     return "primary";
   };
 
-  const filtered = guidesList.filter(g => g.title.toLowerCase().includes(search.toLowerCase()));
+  // Dynamically extract only subjects that exist in the guidesList (excluding null/empty)
+  const subjects = Array.from(
+    new Set(guidesList.map(g => g.subject).filter(Boolean))
+  ) as string[];
+
+  // Filter and sort guidesList
+  const processedGuides = guidesList
+    .filter((g) => {
+      const matchesSearch = g.title.toLowerCase().includes(search.toLowerCase());
+      const guideSubject = g.subject || "General";
+      const matchesSubject = selectedSubject === "All Subjects" || guideSubject === selectedSubject;
+      return matchesSearch && matchesSubject;
+    })
+    .sort((a, b) => {
+      if (selectedSort === "Sort: Newest") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (selectedSort === "Sort: Oldest") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (selectedSort === "Sort: Subject") {
+        const subA = a.subject || "General";
+        const subB = b.subject || "General";
+        return subA.localeCompare(subB);
+      }
+      if (selectedSort === "Sort: Progress") {
+        const progressA = a.status === "ready" ? 100 : a.status === "failed" ? 0 : 30;
+        const progressB = b.status === "ready" ? 100 : b.status === "failed" ? 0 : 30;
+        return progressB - progressA;
+      }
+      return 0;
+    });
 
   return (
     <>
@@ -109,18 +142,25 @@ export default function MyGuidesPage() {
             />
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <select className="bg-white border border-outline-variant rounded-xl px-4 py-2 text-label-md font-label outline-none focus:ring-2 focus:ring-primary/20">
-              <option>All Subjects</option>
-              <option>Computer Science</option>
-              <option>Mathematics</option>
-              <option>Science</option>
-              <option>Business</option>
+            <select 
+              value={selectedSubject} 
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="bg-white border border-outline-variant rounded-xl px-4 py-2 text-label-md font-label outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="All Subjects">All Subjects</option>
+              {subjects.map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
             </select>
-            <select className="bg-white border border-outline-variant rounded-xl px-4 py-2 text-label-md font-label outline-none focus:ring-2 focus:ring-primary/20">
-              <option>Sort: Newest</option>
-              <option>Sort: Progress</option>
-              <option>Sort: Subject</option>
-              <option>Sort: Oldest</option>
+            <select 
+              value={selectedSort} 
+              onChange={(e) => setSelectedSort(e.target.value)}
+              className="bg-white border border-outline-variant rounded-xl px-4 py-2 text-label-md font-label outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="Sort: Newest">Sort: Newest</option>
+              <option value="Sort: Progress">Sort: Progress</option>
+              <option value="Sort: Subject">Sort: Subject</option>
+              <option value="Sort: Oldest">Sort: Oldest</option>
             </select>
           </div>
         </div>
@@ -135,9 +175,9 @@ export default function MyGuidesPage() {
         <div className="bg-red-50 text-red-600 p-6 rounded-3xl border border-red-200/50 text-center my-12">
           <p className="font-medium">{error}</p>
         </div>
-      ) : filtered.length > 0 ? (
+      ) : processedGuides.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((g) => {
+          {processedGuides.map((g) => {
             const isCompleted = g.status === "ready";
             const progress = g.status === "ready" ? 100 : g.status === "failed" ? 0 : 30;
             const subjectColor = getSubjectColor(g.subject);
