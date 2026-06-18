@@ -2,7 +2,7 @@
 
 > **Generated:** June 18, 2026  
 > **Analysis basis:** Full static analysis of `studypilot-app` (frontend) and `studypilot-backend` (backend) source trees.  
-> All statuses are derived **only from actual code present in the repository** — nothing is assumed or inferred from names alone.
+> All statuses are derived **only from actual code present in the repository**.
 
 ---
 
