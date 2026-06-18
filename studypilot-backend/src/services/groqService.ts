@@ -6,11 +6,11 @@ const groq = new Groq({
 });
 
 const MODEL = ENV.GROQ_MODEL || 'llama-3.1-8b-instant';
-const MAX_TOKENS = ENV.GROQ_MAX_TOKENS || 4096;
+const MAX_TOKENS = ENV.GROQ_MAX_TOKENS || 3000;
 const TEMPERATURE = ENV.GROQ_TEMPERATURE || 0.3;
 
 // Safe token limit for input (leave room for system prompt + response)
-const MAX_INPUT_CHARS = 12000;
+const MAX_INPUT_CHARS = 4000;
 
 export function truncateToTokenLimit(text: string): string {
   if (text.length <= MAX_INPUT_CHARS) return text;
@@ -31,9 +31,10 @@ STRICT RULES:
 3. All string values must be properly escaped (no unescaped quotes inside strings).
 4. Arrays must never be empty — always include at least one item.
 5. If content is insufficient for a field, provide a reasonable placeholder.
-6. Generate exactly 10 flashcards, 5 quiz questions, and a complete revision sheet.
+6. Generate exactly 5 flashcards, 3 quiz questions, and a concise revision sheet.
 7. Quiz questions must be multiple-choice with exactly 4 options each.
-8. Always identify the correct answer index (0-3) for quiz questions.`;
+8. Always identify the correct answer index (0-3) for quiz questions.
+9. Keep all text values concise to minimise output size.`;
 }
 
 function buildUserPrompt(content: string): string {
@@ -134,7 +135,7 @@ export async function generateGuideWithGroqRetry(
       lastError = error;
 
       // Don't retry on non-retryable client errors (like 400 Bad Request, 401 Unauthorized, 403 Forbidden)
-      if (error.status === 400 || error.status === 401 || error.status === 403) {
+      if (error.status === 400 || error.status === 401 || error.status === 403 || error.status === 413) {
         throw error;
       }
 
