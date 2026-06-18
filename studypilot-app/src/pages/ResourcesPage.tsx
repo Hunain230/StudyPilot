@@ -44,7 +44,7 @@ export default function ResourcesPage() {
 
   // AI Suggest
   const [suggestTopic, setSuggestTopic] = useState("");
-  const [suggestGuideId, setSuggestGuideId] = useState("");
+  const [suggestType, setSuggestType] = useState("ALL");
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export default function ResourcesPage() {
     setSuggestError(null);
     setSuggestions([]);
     try {
-      const result = await resourceService.suggest(suggestTopic, suggestGuideId || undefined);
+      const result = await resourceService.suggest(suggestTopic, undefined, suggestType);
       setSuggestions(result.suggestions);
     } catch (err: any) {
       console.error(err);
@@ -127,7 +127,6 @@ export default function ResourcesPage() {
         url: s.url,
         type: s.type,
         topic: suggestTopic,
-        guideId: suggestGuideId || undefined,
         notes: s.reason,
       });
       setResources((prev) => [newResource, ...prev]);
@@ -412,16 +411,20 @@ export default function ResourcesPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-label text-label-sm text-on-surface-variant block ml-1">Related Guide (optional)</label>
+                <label className="font-label text-label-sm text-on-surface-variant block ml-1">Resource Type</label>
                 <select
-                  className="w-full bg-[#F1F5F9] border-transparent focus:border-primary border-2 rounded-xl py-2.5 px-4 outline-none font-body text-body-sm"
-                  value={suggestGuideId}
-                  onChange={(e) => setSuggestGuideId(e.target.value)}
+                  className="w-full bg-[#F1F5F9] border-transparent focus:border-primary border-2 rounded-xl py-2.5 px-4 outline-none font-body text-body-sm text-on-surface capitalize"
+                  value={suggestType}
+                  onChange={(e) => setSuggestType(e.target.value)}
                 >
-                  <option value="">None</option>
-                  {guides.map((g: any) => (
-                    <option key={g.id} value={g.id}>{g.title}</option>
-                  ))}
+                  <option value="ALL">All Types</option>
+                  <option value="VIDEO">Videos</option>
+                  <option value="BOOK">Books</option>
+                  <option value="ARTICLE">Articles</option>
+                  <option value="TOOL">Tools</option>
+                  <option value="COURSE">Courses</option>
+                  <option value="PAPER">Papers</option>
+                  <option value="OTHER">Others</option>
                 </select>
               </div>
 

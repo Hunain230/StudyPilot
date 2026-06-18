@@ -43,8 +43,8 @@ export const resourceService = {
     await api.delete(`/v1/resources/${resourceId}`);
   },
 
-  async suggest(topic: string, guideId?: string): Promise<{ topic: string; suggestions: AISuggestion[] }> {
-    const { data } = await api.post('/v1/resources/suggest', { topic, guideId });
+  async suggest(topic: string, guideId?: string, type?: string): Promise<{ topic: string; suggestions: AISuggestion[] }> {
+    const { data } = await api.post('/v1/resources/suggest', { topic, guideId, type });
     return { topic: data.topic, suggestions: data.suggestions || [] };
   },
 };
