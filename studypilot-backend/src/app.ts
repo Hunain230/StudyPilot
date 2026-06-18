@@ -34,6 +34,16 @@ app.use('/api/study-plan', studyplanRoutes);
 app.use('/api/chat',    chatRoutes);
 app.use('/api/v1',      v1Router);
 
+// ── Root route handler ───────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'StudyPilot AI Academic Engine is online and ready.',
+    healthCheck: '/api/health',
+    version: '1.0.0'
+  });
+});
+
 // ── Health Check ─────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
