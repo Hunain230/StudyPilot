@@ -1,6 +1,8 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { guideService } from "../services/guide.service";
+import { quizService } from "../services/quiz.service";
+import { flashcardService } from "../services/flashcard.service";
 
 interface KeyConcept {
   term: string;
@@ -14,10 +16,19 @@ interface TopicHierarchyItem {
 
 interface Flashcard {
   id: string;
-  question: string;
-  answer: string;
-  difficulty: "easy" | "medium" | "hard";
+  question?: string;
+  answer?: string;
+  front?: string;
+  back?: string;
+  difficulty: "easy" | "medium" | "hard" | string;
   orderIndex: number;
+  sm2?: {
+    easeFactor: number;
+    interval: number;
+    repetitions: number;
+    nextReviewAt: string;
+    isDue: boolean;
+  };
 }
 
 interface QuizQuestion {
@@ -76,14 +87,25 @@ export default function GuideDetailsPage() {
   const [activeTab, setActiveTab] = useState<"summary" | "flashcards" | "quiz" | "revision">("summary");
 
   // Flashcards state
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Quiz state
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [submittedQuestions, setSubmittedQuestions] = useState<Record<string, boolean>>({});
   const [quizScore, setQuizScore] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "quiz") {
+      setQuizStartTime(Date.now());
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchGuideDetails = async () => {
@@ -92,6 +114,19 @@ export default function GuideDetailsPage() {
         setLoading(true);
         const data = await guideService.getById(id);
         setGuide(data);
+
+        // Fetch detailed card spaced-repetition stats
+        try {
+          const cardsData = await flashcardService.getCards(id);
+          if (cardsData && cardsData.success) {
+            setFlashcards(cardsData.cards);
+          } else {
+            setFlashcards(data.flashcards || []);
+          }
+        } catch (cardErr) {
+          console.error("Failed to load cards with SM2 metrics:", cardErr);
+          setFlashcards(data.flashcards || []);
+        }
       } catch (err: any) {
         console.error(err);
         setError("Failed to load study guide details. Please try again.");
@@ -130,19 +165,76 @@ export default function GuideDetailsPage() {
 
   // Handle flashcard navigation
   const handleNextCard = () => {
-    if (!guide.flashcards) return;
+    if (!flashcards || flashcards.length === 0) return;
     setIsFlipped(false);
     setTimeout(() => {
-      setCurrentCardIndex((prev) => (prev + 1) % guide.flashcards!.length);
+      setCurrentCardIndex((prev) => (prev + 1) % flashcards.length);
     }, 150);
   };
 
   const handlePrevCard = () => {
-    if (!guide.flashcards) return;
+    if (!flashcards || flashcards.length === 0) return;
     setIsFlipped(false);
     setTimeout(() => {
-      setCurrentCardIndex((prev) => (prev - 1 + guide.flashcards!.length) % guide.flashcards!.length);
+      setCurrentCardIndex((prev) => (prev - 1 + flashcards.length) % flashcards.length);
     }, 150);
+  };
+
+  // Submit flashcard review (quality 0-5)
+  const handleRateCard = async (quality: number) => {
+    if (!flashcards || flashcards.length === 0) return;
+    const currentCard = flashcards[currentCardIndex];
+    setSubmittingReview(true);
+    try {
+      const response = await flashcardService.submitReview(currentCard.id, quality);
+      if (response.success) {
+        // Update the card locally in state
+        setFlashcards(prev => prev.map((c, idx) => {
+          if (idx === currentCardIndex) {
+            return {
+              ...c,
+              sm2: {
+                easeFactor: response.updated.easeFactor,
+                interval: response.updated.interval,
+                repetitions: response.updated.repetitions,
+                nextReviewAt: response.updated.nextReviewAt,
+                isDue: false, // marked as reviewed
+              }
+            };
+          }
+          return c;
+        }));
+        
+        // Brief delay for transition feedback before moving to next card
+        setTimeout(() => {
+          handleNextCard();
+        }, 250);
+      }
+    } catch (err) {
+      console.error("Failed to submit card review", err);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Reset flashcards SM2 progress
+  const handleResetFlashcards = async () => {
+    if (!id) return;
+    try {
+      const res = await flashcardService.resetProgress(id);
+      if (res.success) {
+        // Reload flashcards
+        const cardsData = await flashcardService.getCards(id);
+        if (cardsData && cardsData.success) {
+          setFlashcards(cardsData.cards);
+        }
+        setCurrentCardIndex(0);
+        setIsFlipped(false);
+        setShowResetConfirm(false);
+      }
+    } catch (err) {
+      console.error("Failed to reset flashcard progress", err);
+    }
   };
 
   // Handle quiz option selection
@@ -151,31 +243,47 @@ export default function GuideDetailsPage() {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
   };
 
-  // Submit a single question check
+  // Submit a single question check (locally only)
   const handleSubmitQuestion = (questionId: string) => {
     setSubmittedQuestions(prev => ({ ...prev, [questionId]: true }));
   };
 
   // Submit entire quiz
-  const handleSubmitAllQuiz = () => {
-    if (!guide.quizQuestions) return;
-    let correctCount = 0;
-    
-    guide.quizQuestions.forEach((q) => {
-      const selected = selectedAnswers[q.id];
-      if (selected === q.correctAnswerIndex) {
-        correctCount++;
-      }
-    });
+  const handleSubmitAllQuiz = async () => {
+    if (!guide.quizQuestions || !id) return;
+    setSubmittingQuiz(true);
+    try {
+      const answersPayload = guide.quizQuestions.map((q) => {
+        const selected = selectedAnswers[q.id];
+        return {
+          questionId: q.id,
+          selectedOption: selected !== undefined ? selected : undefined,
+        };
+      });
 
-    setQuizScore(correctCount);
-    setQuizSubmitted(true);
-    // Mark all as submitted
-    const allSubmitted: Record<string, boolean> = {};
-    guide.quizQuestions.forEach((q) => {
-      allSubmitted[q.id] = true;
-    });
-    setSubmittedQuestions(allSubmitted);
+      const timeTakenSec = Math.max(5, Math.round((Date.now() - quizStartTime) / 1000));
+
+      const response = await quizService.submitAttempt(id, {
+        answers: answersPayload.filter(a => a.selectedOption !== undefined),
+        timeTakenSeconds: timeTakenSec,
+      });
+
+      if (response.success) {
+        setQuizScore(response.correct);
+        setQuizSubmitted(true);
+        // Mark all as submitted
+        const allSubmitted: Record<string, boolean> = {};
+        guide.quizQuestions.forEach((q) => {
+          allSubmitted[q.id] = true;
+        });
+        setSubmittedQuestions(allSubmitted);
+      }
+    } catch (err) {
+      console.error("Failed to submit quiz attempt", err);
+      alert("Failed to submit quiz attempt. Please select at least one answer.");
+    } finally {
+      setSubmittingQuiz(false);
+    }
   };
 
   const handleResetQuiz = () => {
@@ -183,6 +291,7 @@ export default function GuideDetailsPage() {
     setSubmittedQuestions({});
     setQuizScore(null);
     setQuizSubmitted(false);
+    setQuizStartTime(Date.now());
   };
 
   const getSourceIcon = (type: string) => {
@@ -252,7 +361,7 @@ export default function GuideDetailsPage() {
           }`}
         >
           <span className="material-symbols-outlined text-base">style</span>
-          Flashcards ({guide.flashcards?.length || 0})
+          Flashcards ({flashcards.length})
         </button>
         <button
           onClick={() => setActiveTab("quiz")}
@@ -357,11 +466,38 @@ export default function GuideDetailsPage() {
         {/* Tab 2: Flashcards */}
         {activeTab === "flashcards" && (
           <div className="max-w-2xl mx-auto flex flex-col items-center py-6">
-            {guide.flashcards && guide.flashcards.length > 0 ? (
+            {flashcards && flashcards.length > 0 ? (
               <>
-                <p className="font-label text-label-sm text-on-surface-variant mb-4">
-                  CARD {currentCardIndex + 1} OF {guide.flashcards.length}
-                </p>
+                <div className="flex justify-between items-center w-full max-w-2xl mb-4">
+                  <p className="font-label text-label-sm text-on-surface-variant font-bold">
+                    CARD {currentCardIndex + 1} OF {flashcards.length}
+                  </p>
+                  {showResetConfirm ? (
+                    <div className="flex items-center gap-2 bg-red-50 p-1.5 rounded-xl border border-red-100 animate-fade-in">
+                      <span className="text-[10px] font-label font-bold text-red-700 uppercase pl-1.5">Reset Progress?</span>
+                      <button
+                        onClick={handleResetFlashcards}
+                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-[10px] font-label font-bold transition-colors"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setShowResetConfirm(false)}
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded-lg text-[10px] font-label font-bold transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowResetConfirm(true)}
+                      className="text-xs text-red-600 hover:text-red-700 font-label font-bold flex items-center gap-1 hover:underline bg-red-50 px-3 py-1.5 rounded-xl border border-red-100 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">restart_alt</span>
+                      Reset Progress
+                    </button>
+                  )}
+                </div>
 
                 {/* Flip Card Container */}
                 <div 
@@ -381,12 +517,24 @@ export default function GuideDetailsPage() {
                       className="absolute inset-0 bg-white rounded-3xl p-8 flex flex-col justify-between items-center text-center"
                       style={{ backfaceVisibility: "hidden" }}
                     >
-                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase self-start">
-                        {guide.flashcards[currentCardIndex].difficulty}
-                      </span>
+                      <div className="flex justify-between items-center w-full">
+                        <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase self-start">
+                          {flashcards[currentCardIndex].difficulty}
+                        </span>
+                        {flashcards[currentCardIndex].sm2 && flashcards[currentCardIndex].sm2!.repetitions > 0 && (
+                          <span className="text-slate-400 text-[10px] font-label font-medium uppercase">
+                            Interval: {flashcards[currentCardIndex].sm2!.interval}d | Reps: {flashcards[currentCardIndex].sm2!.repetitions}
+                          </span>
+                        )}
+                        {flashcards[currentCardIndex].sm2?.isDue && (
+                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[9px] font-label font-bold uppercase animate-pulse">
+                            Due
+                          </span>
+                        )}
+                      </div>
                       <div className="flex-grow flex items-center justify-center max-w-md">
                         <p className="font-headline text-headline-md font-bold text-on-surface">
-                          {guide.flashcards[currentCardIndex].question}
+                          {flashcards[currentCardIndex].front || flashcards[currentCardIndex].question}
                         </p>
                       </div>
                       <p className="text-label-sm text-primary font-label flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
@@ -403,12 +551,19 @@ export default function GuideDetailsPage() {
                         transform: "rotateY(180deg)" 
                       }}
                     >
-                      <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase self-start">
-                        Answer
-                      </span>
+                      <div className="flex justify-between items-center w-full">
+                        <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase self-start">
+                          Answer
+                        </span>
+                        {flashcards[currentCardIndex].sm2 && (
+                          <span className="text-primary/60 text-[10px] font-label font-medium uppercase">
+                            EF: {Number(flashcards[currentCardIndex].sm2!.easeFactor).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex-grow flex items-center justify-center max-w-md">
                         <p className="font-body text-body-lg text-on-surface leading-relaxed">
-                          {guide.flashcards[currentCardIndex].answer}
+                          {flashcards[currentCardIndex].back || flashcards[currentCardIndex].answer}
                         </p>
                       </div>
                       <p className="text-label-sm text-slate-500 font-label flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
@@ -419,29 +574,69 @@ export default function GuideDetailsPage() {
                   </div>
                 </div>
 
-                {/* Controls */}
-                <div className="flex items-center gap-6">
-                  <button 
-                    onClick={handlePrevCard}
-                    className="p-3 bg-white border border-outline-variant/30 rounded-2xl hover:bg-slate-50 transition-colors flex items-center justify-center"
-                    title="Previous Card"
-                  >
-                    <span className="material-symbols-outlined">arrow_back_ios_new</span>
-                  </button>
-                  <button 
-                    onClick={() => setIsFlipped(!isFlipped)}
-                    className="bg-primary/10 text-primary hover:bg-primary/20 px-8 py-3 rounded-full font-label text-label-md transition-colors"
-                  >
-                    Flip Card
-                  </button>
-                  <button 
-                    onClick={handleNextCard}
-                    className="p-3 bg-white border border-outline-variant/30 rounded-2xl hover:bg-slate-50 transition-colors flex items-center justify-center"
-                    title="Next Card"
-                  >
-                    <span className="material-symbols-outlined">arrow_forward_ios</span>
-                  </button>
-                </div>
+                {/* Controls and SM2 quality ratings */}
+                {isFlipped ? (
+                  <div className="w-full max-w-md bg-white p-5 rounded-3xl border border-outline-variant/30 shadow-sm mb-8 flex flex-col items-center gap-3 animate-fade-in">
+                    <p className="text-label-sm font-label text-on-surface-variant font-bold uppercase">How well did you recall this?</p>
+                    <div className="grid grid-cols-4 gap-2.5 w-full">
+                      <button
+                        onClick={() => handleRateCard(1)}
+                        disabled={submittingReview}
+                        className="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-3 rounded-2xl text-xs font-label font-bold flex flex-col items-center gap-1.5 border border-red-200 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-lg">sentiment_very_dissatisfied</span>
+                        Forgot
+                      </button>
+                      <button
+                        onClick={() => handleRateCard(3)}
+                        disabled={submittingReview}
+                        className="bg-orange-50 hover:bg-orange-100 text-orange-700 px-3 py-3 rounded-2xl text-xs font-label font-bold flex flex-col items-center gap-1.5 border border-orange-200 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-lg">sentiment_dissatisfied</span>
+                        Hard
+                      </button>
+                      <button
+                        onClick={() => handleRateCard(4)}
+                        disabled={submittingReview}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-3 rounded-2xl text-xs font-label font-bold flex flex-col items-center gap-1.5 border border-blue-200 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-lg">sentiment_satisfied</span>
+                        Good
+                      </button>
+                      <button
+                        onClick={() => handleRateCard(5)}
+                        disabled={submittingReview}
+                        className="bg-green-50 hover:bg-green-100 text-green-700 px-3 py-3 rounded-2xl text-xs font-label font-bold flex flex-col items-center gap-1.5 border border-green-200 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-lg">mood</span>
+                        Easy
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-6 mb-8">
+                    <button 
+                      onClick={handlePrevCard}
+                      className="p-3 bg-white border border-outline-variant/30 rounded-2xl hover:bg-slate-50 transition-colors flex items-center justify-center"
+                      title="Previous Card"
+                    >
+                      <span className="material-symbols-outlined">arrow_back_ios_new</span>
+                    </button>
+                    <button 
+                      onClick={() => setIsFlipped(true)}
+                      className="bg-primary text-on-primary hover:brightness-110 px-8 py-3 rounded-full font-label text-label-md transition-colors"
+                    >
+                      Flip Card
+                    </button>
+                    <button 
+                      onClick={handleNextCard}
+                      className="p-3 bg-white border border-outline-variant/30 rounded-2xl hover:bg-slate-50 transition-colors flex items-center justify-center"
+                      title="Next Card"
+                    >
+                      <span className="material-symbols-outlined">arrow_forward_ios</span>
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <p className="text-body-md text-on-surface-variant italic">No flashcards available for this study guide.</p>
@@ -571,10 +766,15 @@ export default function GuideDetailsPage() {
                   <div className="flex justify-center pt-4">
                     <button
                       onClick={handleSubmitAllQuiz}
-                      className="bg-primary text-on-primary px-8 py-3 rounded-2xl font-label text-label-md hover:shadow-lg transition-all flex items-center gap-2"
+                      disabled={submittingQuiz}
+                      className="bg-primary text-on-primary px-8 py-3 rounded-2xl font-label text-label-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
-                      <span className="material-symbols-outlined">assignment_turned_in</span>
-                      Submit Entire Quiz
+                      {submittingQuiz ? (
+                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                      ) : (
+                        <span className="material-symbols-outlined">assignment_turned_in</span>
+                      )}
+                      {submittingQuiz ? "Submitting Quiz..." : "Submit Entire Quiz"}
                     </button>
                   </div>
                 )}
