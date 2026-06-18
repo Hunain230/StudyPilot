@@ -20,6 +20,11 @@ export const doubtSchema = z.object({
   question: z.string().min(5).max(500),
 });
 
+export const tutorAskSchema = z.object({
+  question: z.string().min(3).max(1000),
+  guideId: z.string().uuid().optional().nullable(),
+});
+
 export const plannerSchema = z.object({
   guideId: z.string().uuid().optional().nullable(),
   topic: z.string().max(255).optional(),

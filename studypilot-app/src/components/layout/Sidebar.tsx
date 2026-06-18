@@ -6,6 +6,7 @@ const navItems = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard" },
   { label: "My Guides", icon: "auto_stories", href: "/guides" },
   { label: "New Guide", icon: "add_circle", href: "/guides/new" },
+  { label: "AI Tutor", icon: "psychology", href: "/ai-tutor" },
   { label: "Resources", icon: "library_books", href: "/resources" },
   { label: "History", icon: "history", href: "/history" },
   { label: "Settings", icon: "settings", href: "/settings" },

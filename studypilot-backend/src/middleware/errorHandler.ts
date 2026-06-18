@@ -136,7 +136,8 @@ export const errorHandler = (
 
   // Zod Validation Errors
   if (err.name === 'ZodError') {
-    const message = err.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+    const issues = err.errors || err.issues || [];
+    const message = issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ') || 'Invalid request payload.';
     return res.status(400).json({
       success: false,
       error: {

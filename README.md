@@ -52,6 +52,7 @@ StudyPilot AI is a premium, AI-powered study companion that transforms raw learn
    DATABASE_URL="mysql://username:password@localhost:3306/studypilot"
    JWT_SECRET="your_jwt_secret_key"
    GROQ_API_KEY="your_groq_api_key"
+   TAVILY_API_KEY="your_tavily_api_key"
    ```
 
 4. Push the database schema:

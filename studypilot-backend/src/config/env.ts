@@ -22,6 +22,8 @@ export const ENV = {
   GROQ_MAX_TOKENS: parseInt(process.env.GROQ_MAX_TOKENS || '4096', 10),
   GROQ_TEMPERATURE: parseFloat(process.env.GROQ_TEMPERATURE || '0.3'),
   GROQ_RPM_LIMIT: parseInt(process.env.GROQ_RPM_LIMIT || '25', 10),
+  TAVILY_API_KEY: process.env.TAVILY_API_KEY || '',
+  WEB_SEARCH_MAX_RESULTS: parseInt(process.env.WEB_SEARCH_MAX_RESULTS || '5', 10),
   VECTOR_STORE_PATH: process.env.VECTOR_STORE_PATH || './data/faiss_index',
   PDF_TEMP_DIR: process.env.PDF_TEMP_DIR || './tmp/exports',
   READINESS_PASS_THRESHOLD: parseInt(process.env.READINESS_PASS_THRESHOLD || '70', 10),

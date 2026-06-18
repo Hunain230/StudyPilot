@@ -7,6 +7,7 @@ import historyRoutes from './history.routes';
 import resourcesRoutes from './resources.routes';
 import doubtRoutes from './doubt.routes';
 import exportRoutes from './export.routes';
+import tutorRoutes from './tutor.routes';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/history', historyRoutes);
 router.use('/resources', resourcesRoutes);
 router.use('/doubt', doubtRoutes);
 router.use('/export', exportRoutes);
+router.use('/tutor', tutorRoutes);
 
 export default router;

@@ -10,6 +10,7 @@ import HistoryPage from "./pages/HistoryPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import GuideDetailsPage from "./pages/GuideDetailsPage";
 import SettingsPage from "./pages/SettingsPage";
+import AITutorPage from "./pages/AITutorPage";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/guides" element={<MyGuidesPage />} />
           <Route path="/guides/new" element={<CreateGuidePage />} />
           <Route path="/guides/:id" element={<GuideDetailsPage />} />
+          <Route path="/ai-tutor" element={<AITutorPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/settings" element={<SettingsPage />} />

@@ -92,7 +92,7 @@ export default function HistoryPage() {
       for (let row = 0; row < 4; row++) {
         const dayOffset = col * 4 + row;
         const d = new Date(today);
-        d.setDate(d.getDate() - (27 - (col * 4 + row)));
+        d.setDate(d.getDate() - (27 - dayOffset));
         const dateStr = d.toISOString().split("T")[0];
         const count = calMap[dateStr] || 0;
         let bg = "bg-outline-variant/20";
