@@ -1,4 +1,4 @@
-import pdfParse = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { sanitizeNotes } from '../utils/textCleaner';
 
@@ -7,7 +7,8 @@ import { sanitizeNotes } from '../utils/textCleaner';
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const data = await (pdfParse as any)(buffer);
+    const parser = new PDFParse({ data: buffer });
+    const data = await parser.getText();
     
     if (!data.text || data.text.trim().length < 10) {
       throw new Error('PDF appears to be empty or contains only images. Please upload a text-based PDF.');
@@ -25,9 +26,10 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
  */
 export async function getPDFMetadata(buffer: Buffer): Promise<{ pages: number; wordCount: number }> {
   try {
-    const data = await (pdfParse as any)(buffer);
+    const parser = new PDFParse({ data: buffer });
+    const data = await parser.getText();
     return {
-      pages: data.numpages,
+      pages: data.total,
       wordCount: data.text.split(/\s+/).filter(Boolean).length,
     };
   } catch (error: any) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import { analyticsService, OverviewStats, QuizTrendData, WeakTopicItem, ScorePrediction } from "../services/analytics.service";
+import { analyticsService } from "../services/analytics.service";
+import type { OverviewStats, QuizTrendData, WeakTopicItem, ScorePrediction } from "../services/analytics.service";
 import { guideService } from "../services/guide.service";
 import type { UserProfile } from "../components/layout/DashboardLayout";
 
