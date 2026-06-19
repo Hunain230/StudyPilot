@@ -1,7 +1,8 @@
 import { prisma } from '../config/db';
 import { extractTextFromPDF, extractTextFromNotes, extractTextFromYouTube, sanitizeNotes } from './extractionService';
-import { generateGuideWithGroqRetry, truncateToTokenLimit } from './groqService';
+import { generateDetailedSummaryWithAgents, generateGuideWithGroqRetry, getWebEnrichmentForDetailedSummary, truncateToTokenLimit } from './groqService';
 import { parseAndValidateGroqResponse } from '../validators/aiResponseValidator';
+import { invalidateCachedGuide } from './cacheService';
 import crypto from 'crypto';
 import { Difficulty } from '@prisma/client';
 import fs from 'fs';
@@ -28,6 +29,12 @@ export interface PipelineInput {
 function resolveComponents(selectedComponents?: ComponentKey[]): ComponentKey[] {
   if (!selectedComponents || selectedComponents.length === 0) return ALL_COMPONENTS;
   return selectedComponents;
+}
+
+function invalidateInputGuideCache(input: PipelineInput) {
+  if (input.guideId) {
+    invalidateCachedGuide(input.guideId, input.userId);
+  }
 }
 
 export async function generateGuide(input: PipelineInput) {
@@ -87,6 +94,7 @@ export async function generateGuide(input: PipelineInput) {
     if (input.guideId && input.guideId !== existingGuide.id) {
       try {
         await prisma.guide.delete({ where: { id: input.guideId } });
+        invalidateInputGuideCache(input);
       } catch (err) {
         // ignore
       }
@@ -103,6 +111,26 @@ export async function generateGuide(input: PipelineInput) {
 
   // Step 5: Validate
   const validated = parseAndValidateGroqResponse(groqRawResponse);
+
+  const webContext = await getWebEnrichmentForDetailedSummary({
+    title: input.title,
+    shortSummary: validated.shortSummary,
+    topics: validated.topics,
+    keyConcepts: validated.keyConcepts,
+  });
+
+  const agentDetailedSummary = await generateDetailedSummaryWithAgents({
+    title: input.title,
+    content: contentForAI,
+    shortSummary: validated.shortSummary,
+    topics: validated.topics,
+    keyConcepts: validated.keyConcepts,
+    webContext: webContext || undefined,
+  });
+
+  if (agentDetailedSummary) {
+    validated.detailedSummary = agentDetailedSummary;
+  }
 
   // Step 6: Persist everything in a database transaction
   const guide = await prisma.$transaction(async (tx) => {
@@ -257,9 +285,11 @@ export function generateGuideAsync(input: PipelineInput) {
           where: { id: input.guideId },
           data: { status: 'processing' },
         });
+        invalidateInputGuideCache(input);
       }
 
       await generateGuide(input);
+      invalidateInputGuideCache(input);
       console.log(`[Background AI] Successfully generated guide for user: ${input.userId}`);
     } catch (err: any) {
       console.error(`[Background AI] Guide generation failed:`, err);
@@ -270,6 +300,7 @@ export function generateGuideAsync(input: PipelineInput) {
             where: { id: input.guideId },
             data: { status: 'failed' },
           });
+          invalidateInputGuideCache(input);
         } catch (dbErr) {
           console.error('[Background AI] Failed to update guide status to FAILED in database:', dbErr);
         }

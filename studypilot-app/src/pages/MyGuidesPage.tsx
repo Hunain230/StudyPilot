@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect, type MouseEvent } from "react";
+import { useCallback, useState, useEffect, type MouseEvent } from "react";
 import { guideService } from "../services/guide.service";
 
 export interface GuideListItem {
@@ -8,7 +8,7 @@ export interface GuideListItem {
   description: string | null;
   subject: string | null;
   sourceType: "pdf" | "youtube" | "notes" | "mixed";
-  status: "processing" | "ready" | "failed";
+  status: "pending" | "processing" | "ready" | "failed";
   createdAt: string;
   _count: {
     flashcards: number;
@@ -25,21 +25,37 @@ export default function MyGuidesPage() {
   const [selectedSort, setSelectedSort] = useState("Sort: Newest");
   const [exportingGuides, setExportingGuides] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    const fetchGuides = async () => {
-      try {
-        setLoading(true);
-        const data = await guideService.getAll();
-        setGuidesList(data || []);
-      } catch (err: any) {
-        console.error(err);
+  const fetchGuides = useCallback(async (showLoader = true) => {
+    try {
+      if (showLoader) setLoading(true);
+      const data = await guideService.getAll();
+      setGuidesList(data || []);
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      if (showLoader) {
         setError("Failed to load your study guides. Please try again later.");
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchGuides();
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchGuides();
+  }, [fetchGuides]);
+
+  const hasProcessingGuides = guidesList.some(g => g.status === "pending" || g.status === "processing");
+
+  useEffect(() => {
+    if (!hasProcessingGuides) return;
+
+    const pollId = window.setInterval(() => {
+      fetchGuides(false);
+    }, 3000);
+
+    return () => window.clearInterval(pollId);
+  }, [fetchGuides, hasProcessingGuides]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this guide?")) {

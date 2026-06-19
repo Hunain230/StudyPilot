@@ -31,6 +31,10 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
     // If it's a PDF and linked to a guide, trigger generation in background
     if (isPdf && guideId) {
       const { generateGuideAsync } = require('../services/guideGenerationService');
+      const linkedGuide = await prisma.guide.findFirst({
+        where: { id: guideId, userId: req.user!.userId },
+        select: { title: true },
+      });
       // Parse selectedComponents if sent as JSON string
       let selectedComponents: string[] | undefined;
       if (req.body.selectedComponents) {
@@ -47,6 +51,7 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
         guideId,
         sourceType: 'pdf',
         pdfFilePath: file.path,
+        title: linkedGuide?.title,
         selectedComponents,
       });
     }

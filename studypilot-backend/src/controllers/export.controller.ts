@@ -41,6 +41,60 @@ function safePdfFilename(title: string) {
   return `StudyPilot-Guide-${safeTitle || 'Study-Guide'}.pdf`;
 }
 
+const DETAILED_SUMMARY_HEADINGS = ['Introduction', 'Main Idea', 'Intuition', 'Applications', 'Conclusion'] as const;
+
+type DetailedSummarySection = {
+  heading: typeof DETAILED_SUMMARY_HEADINGS[number];
+  body: string;
+};
+
+function parseDetailedSummarySections(summary?: string | null): DetailedSummarySection[] | null {
+  if (!summary) return null;
+
+  const normalized = summary.replace(/\r\n/g, '\n').trim();
+  const headingPattern = DETAILED_SUMMARY_HEADINGS.join('|');
+  const headingRegex = new RegExp(`(^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?(${headingPattern})(?:\\*\\*)?\\s*:?\\s*(?=\\n|$)`, 'gi');
+  const matches = Array.from(normalized.matchAll(headingRegex));
+
+  if (matches.length !== DETAILED_SUMMARY_HEADINGS.length) return null;
+
+  const sections = matches.map((match, index) => {
+    const heading = match[2] as DetailedSummarySection['heading'];
+    const expectedHeading = DETAILED_SUMMARY_HEADINGS[index];
+    if (heading.toLowerCase() !== expectedHeading.toLowerCase()) return null;
+
+    const bodyStart = (match.index || 0) + match[0].length;
+    const bodyEnd = index + 1 < matches.length ? matches[index + 1].index || normalized.length : normalized.length;
+    const body = normalized.slice(bodyStart, bodyEnd).trim();
+
+    return { heading: expectedHeading, body };
+  });
+
+  if (sections.some(section => !section || !section.body)) return null;
+  return sections as DetailedSummarySection[];
+}
+
+function writeDetailedSummary(doc: any, summary: string) {
+  const sections = parseDetailedSummarySections(summary);
+
+  if (!sections) {
+    doc.fontSize(10).fillColor('#334155').font('Helvetica').text(summary, {
+      align: 'justify',
+      width: 495,
+    });
+    return;
+  }
+
+  sections.forEach((section) => {
+    doc.fontSize(10).fillColor('#0f172a').font('Helvetica-Bold').text(section.heading, { width: 495 });
+    doc.fontSize(10).fillColor('#334155').font('Helvetica').text(section.body, {
+      align: 'justify',
+      width: 495,
+    });
+    doc.moveDown(0.7);
+  });
+}
+
 // GET /api/v1/export/guide/:guideId/content
 export async function exportGuideContent(req: Request, res: Response, next: NextFunction) {
   try {
@@ -96,10 +150,7 @@ export async function exportGuideContent(req: Request, res: Response, next: Next
 
         addSection(doc, 'Detailed Explanations');
         if (content?.detailedSummary) {
-          doc.fontSize(10).fillColor('#334155').font('Helvetica').text(content.detailedSummary, {
-            align: 'justify',
-            width: 495,
-          });
+          writeDetailedSummary(doc, content.detailedSummary);
         } else {
           doc.text('No detailed explanation was generated for this guide.');
         }

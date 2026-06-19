@@ -80,6 +80,39 @@ interface Guide {
   revisionSheet?: RevisionSheet;
 }
 
+const DETAILED_SUMMARY_HEADINGS = ["Introduction", "Main Idea", "Intuition", "Applications", "Conclusion"] as const;
+
+type DetailedSummarySection = {
+  heading: typeof DETAILED_SUMMARY_HEADINGS[number];
+  body: string;
+};
+
+function parseDetailedSummarySections(summary?: string | null): DetailedSummarySection[] | null {
+  if (!summary) return null;
+
+  const normalized = summary.replace(/\r\n/g, "\n").trim();
+  const headingPattern = DETAILED_SUMMARY_HEADINGS.join("|");
+  const headingRegex = new RegExp(`(^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?(${headingPattern})(?:\\*\\*)?\\s*:?\\s*(?=\\n|$)`, "gi");
+  const matches = Array.from(normalized.matchAll(headingRegex));
+
+  if (matches.length !== DETAILED_SUMMARY_HEADINGS.length) return null;
+
+  const sections = matches.map((match, index) => {
+    const heading = match[2] as DetailedSummarySection["heading"];
+    const expectedHeading = DETAILED_SUMMARY_HEADINGS[index];
+    if (heading.toLowerCase() !== expectedHeading.toLowerCase()) return null;
+
+    const bodyStart = (match.index || 0) + match[0].length;
+    const bodyEnd = index + 1 < matches.length ? matches[index + 1].index || normalized.length : normalized.length;
+    const body = normalized.slice(bodyStart, bodyEnd).trim();
+
+    return { heading: expectedHeading, body };
+  });
+
+  if (sections.some(section => !section || !section.body)) return null;
+  return sections as DetailedSummarySection[];
+}
+
 export default function GuideDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [guide, setGuide] = useState<Guide | null>(null);
@@ -312,6 +345,7 @@ export default function GuideDetailsPage() {
   const metadata = guide.content?.metadata;
   const wordCount = metadata?.wordCount || 0;
   const readingTime = metadata?.estimatedReadingTime || `${Math.ceil(wordCount / 200) || 5} mins`;
+  const detailedSummarySections = parseDetailedSummarySections(guide.content?.detailedSummary);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -439,9 +473,22 @@ export default function GuideDetailsPage() {
               {/* Detailed Summary Card */}
               <div className="glass-card rounded-3xl p-8 space-y-4">
                 <h3 className="font-headline text-headline-md font-bold text-on-surface">Detailed Explanations</h3>
-                <div className="font-body text-body-md text-on-surface-variant space-y-4 whitespace-pre-line leading-relaxed">
-                  {guide.content?.detailedSummary}
-                </div>
+                {detailedSummarySections ? (
+                  <div className="space-y-5">
+                    {detailedSummarySections.map(section => (
+                      <section key={section.heading} className="border-l-4 border-primary/30 pl-4">
+                        <h4 className="font-label text-label-lg font-bold text-on-surface mb-1">{section.heading}</h4>
+                        <p className="font-body text-body-md text-on-surface-variant leading-relaxed whitespace-pre-line">
+                          {section.body}
+                        </p>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="font-body text-body-md text-on-surface-variant space-y-4 whitespace-pre-line leading-relaxed">
+                    {guide.content?.detailedSummary}
+                  </div>
+                )}
               </div>
             </div>
 

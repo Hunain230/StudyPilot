@@ -1,6 +1,8 @@
 import Groq from 'groq-sdk';
 import { ENV } from '../config/env';
 import type { ComponentKey } from './guideGenerationService';
+import { parseAiJsonObject } from '../validators/aiResponseValidator';
+import { searchWeb, WebSearchResult } from './webSearchService';
 
 const groq = new Groq({
   apiKey: ENV.GROQ_API_KEY,
@@ -9,6 +11,27 @@ const groq = new Groq({
 const MODEL = ENV.GROQ_MODEL || 'llama-3.1-8b-instant';
 const MAX_TOKENS = ENV.GROQ_MAX_TOKENS || 3000;
 const TEMPERATURE = ENV.GROQ_TEMPERATURE || 0.3;
+const SECTION_AGENT_CONCURRENCY = 2;
+const SECTION_AGENT_MAX_TOKENS = Math.min(MAX_TOKENS, 2200);
+const MAX_WEB_QUERIES = 2;
+const MAX_WEB_RESULTS_PER_QUERY = 3;
+const DETAILED_SUMMARY_SECTIONS = ['Introduction', 'Main Idea', 'Intuition', 'Applications', 'Conclusion'] as const;
+
+type DetailedSummarySection = typeof DETAILED_SUMMARY_SECTIONS[number];
+
+interface DetailedSummaryAgentInput {
+  title?: string;
+  content: string;
+  shortSummary: string;
+  topics: string[];
+  keyConcepts: Array<{ term: string; definition: string }>;
+  webContext?: string;
+}
+
+interface DetailedSummaryAgentResult {
+  section: DetailedSummarySection;
+  body: string;
+}
 
 // Safe token limit for input (leave room for system prompt + response)
 const MAX_INPUT_CHARS = 4000;
@@ -43,7 +66,9 @@ function buildSystemPrompt(components: ComponentKey[]): string {
     needsMindMap
       ? `9. Generate a rich, detailed topicHierarchy with at least 5 main topics, each with 2-5 subtopics, for the mind map visualization.`
       : `9. Generate a standard topicHierarchy.`,
-    `10. Keep all text values concise to minimise output size.`,
+    `10. The detailedSummary string must contain exactly these five section headings in this order: Introduction, Main Idea, Intuition, Applications, Conclusion.`,
+    `11. Because detailedSummary is a JSON string, separate those headings and paragraphs with escaped newline characters like \\n, never literal unescaped line breaks inside the string.`,
+    `12. Keep all text values concise to minimise output size.`,
   ].join('\n');
 
   return `You are StudyPilot, an expert educational assistant specialising in generating comprehensive study materials.
@@ -101,7 +126,7 @@ Return a JSON object with EXACTLY this structure (all fields required):
 
 {
   "shortSummary": "string (2-3 sentences summarising the core topic)",
-  "detailedSummary": "string (4-6 paragraphs covering main ideas, context, and implications)",
+  "detailedSummary": "Introduction\\n1 concise paragraph.\\n\\nMain Idea\\n1 concise paragraph.\\n\\nIntuition\\n1 concise paragraph.\\n\\nApplications\\n1 concise paragraph.\\n\\nConclusion\\n1 concise paragraph.",
   "cleanedContent": "string (the content cleaned up: fix grammar, remove filler words, improve readability — keep all information intact)",
   "keyConcepts": [
     {
@@ -128,6 +153,224 @@ Return a JSON object with EXACTLY this structure (all fields required):
 }`;
 }
 
+function cleanSearchTerm(value: string): string {
+  return value
+    .replace(/[^\w\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function buildDetailedSummarySearchQueries(input: {
+  title?: string;
+  shortSummary: string;
+  topics: string[];
+  keyConcepts: Array<{ term: string; definition: string }>;
+}): string[] {
+  const title = input.title ? cleanSearchTerm(input.title) : '';
+  const topics = input.topics.slice(0, 4).map(cleanSearchTerm).filter(Boolean);
+  const keyTerms = input.keyConcepts.slice(0, 3).map(c => cleanSearchTerm(c.term)).filter(Boolean);
+
+  const queries = [
+    [title, ...topics.slice(0, 3), 'study guide explanation'].filter(Boolean).join(' '),
+    [...keyTerms, ...topics.slice(0, 2), 'concept applications intuition'].filter(Boolean).join(' '),
+  ]
+    .map(query => query.trim())
+    .filter(query => query.length > 0);
+
+  return Array.from(new Set(queries)).slice(0, MAX_WEB_QUERIES);
+}
+
+export function formatWebResultsForGuideGeneration(results: WebSearchResult[]): string {
+  return results
+    .map((result, index) => {
+      const snippet = result.content.replace(/\s+/g, ' ').trim().slice(0, 700);
+      return `[Web ${index + 1}] ${result.title}\nURL: ${result.url}\nSnippet: ${snippet}`;
+    })
+    .join('\n\n');
+}
+
+export async function getWebEnrichmentForDetailedSummary(input: {
+  title?: string;
+  shortSummary: string;
+  topics: string[];
+  keyConcepts: Array<{ term: string; definition: string }>;
+}): Promise<string | null> {
+  const queries = buildDetailedSummarySearchQueries(input);
+  if (queries.length === 0) return null;
+
+  try {
+    const uniqueResults = new Map<string, WebSearchResult>();
+
+    for (const query of queries) {
+      const results = await searchWeb(query);
+      const boundedResults = results.slice(0, MAX_WEB_RESULTS_PER_QUERY);
+
+      for (const result of boundedResults) {
+        if (!uniqueResults.has(result.url)) {
+          uniqueResults.set(result.url, result);
+        }
+      }
+    }
+
+    const webResults = Array.from(uniqueResults.values());
+    if (webResults.length === 0) return null;
+
+    return formatWebResultsForGuideGeneration(webResults);
+  } catch (err) {
+    console.warn('[DetailedSummaryWeb] Continuing without web enrichment:', err);
+    return null;
+  }
+}
+
+function buildSectionAgentSystemPrompt(section: DetailedSummarySection): string {
+  return `You are a StudyPilot specialist agent responsible only for the "${section}" section of a study guide.
+
+Return ONLY a valid JSON object. No markdown, no code fences, no preamble.
+The JSON shape must be exactly: { "section": "${section}", "body": "string" }.
+The body must be 2-3 strong academic paragraphs with clear, student-friendly wording.`;
+}
+
+function buildSectionAgentUserPrompt(section: DetailedSummarySection, input: DetailedSummaryAgentInput): string {
+  const topics = input.topics.length > 0 ? input.topics.join(', ') : 'General topic';
+  const concepts = input.keyConcepts.length > 0
+    ? input.keyConcepts.map(c => `${c.term}: ${c.definition}`).join('\n')
+    : 'No extracted key concepts were provided.';
+  const webContext = input.webContext?.trim()
+    ? input.webContext
+    : 'No external web reference context was available. Use only the source content and extracted guide context.';
+
+  return `Write the "${section}" section for this study guide.
+
+Section goal:
+${getSectionGoal(section)}
+
+Writing rules:
+- Treat the source content as the primary theme, direction, and scope of the guide.
+- Use the external web reference context only to enrich explanation depth, examples, intuition, and applications.
+- Do not cite, quote, or invent URLs in the body. Do not add facts that are unsupported by either the source content or web snippets.
+- Write 2-3 cohesive paragraphs for this section. Use clear academic language that a student can study from.
+
+Short summary:
+${input.shortSummary}
+
+Topics:
+${topics}
+
+Key concepts:
+${concepts}
+
+Source content:
+${input.content}
+
+External web reference context:
+${webContext}
+
+Return JSON only:
+{ "section": "${section}", "body": "2-3 polished paragraphs" }`;
+}
+
+function getSectionGoal(section: DetailedSummarySection): string {
+  switch (section) {
+    case 'Introduction':
+      return 'Introduce the topic, why it matters, and what the learner should expect.';
+    case 'Main Idea':
+      return 'Explain the central concept or mechanism clearly and directly.';
+    case 'Intuition':
+      return 'Build an intuitive mental model using simple reasoning or analogy without becoming casual.';
+    case 'Applications':
+      return 'Explain where the idea is used, practiced, or observed in real academic or practical contexts.';
+    case 'Conclusion':
+      return 'Summarise the takeaway and connect the section back to studying or revision.';
+  }
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex++;
+      results[currentIndex] = await worker(items[currentIndex]);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => runWorker()
+  );
+
+  await Promise.all(workers);
+  return results;
+}
+
+async function generateDetailedSummarySection(
+  section: DetailedSummarySection,
+  input: DetailedSummaryAgentInput
+): Promise<DetailedSummaryAgentResult> {
+  const response = await groq.chat.completions.create({
+    model: MODEL,
+    max_tokens: SECTION_AGENT_MAX_TOKENS,
+    temperature: TEMPERATURE,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: buildSectionAgentSystemPrompt(section) },
+      { role: 'user', content: buildSectionAgentUserPrompt(section, input) },
+    ],
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error(`Groq returned an empty ${section} section response.`);
+  }
+
+  const parsed = parseAiJsonObject(content);
+  const parsedSection = typeof parsed.section === 'string' ? parsed.section.trim() : '';
+  const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
+
+  if (parsedSection.toLowerCase() !== section.toLowerCase() || !body) {
+    throw new Error(`Groq returned an invalid ${section} section response.`);
+  }
+
+  return { section, body };
+}
+
+function compileDetailedSummary(results: DetailedSummaryAgentResult[]): string {
+  return DETAILED_SUMMARY_SECTIONS
+    .map((section) => {
+      const result = results.find(r => r.section === section);
+      return `${section}\n${result?.body || ''}`;
+    })
+    .join('\n\n');
+}
+
+export async function generateDetailedSummaryWithAgents(input: DetailedSummaryAgentInput): Promise<string | null> {
+  try {
+    const results = await runWithConcurrency(
+      [...DETAILED_SUMMARY_SECTIONS],
+      SECTION_AGENT_CONCURRENCY,
+      (section) => generateDetailedSummarySection(section, input)
+    );
+
+    if (
+      results.length !== DETAILED_SUMMARY_SECTIONS.length ||
+      results.some(result => !result.body.trim())
+    ) {
+      return null;
+    }
+
+    return compileDetailedSummary(results);
+  } catch (err) {
+    console.error('[DetailedSummaryAgents] Falling back to base detailedSummary:', err);
+    return null;
+  }
+}
+
 export async function generateGuideWithGroq(cleanedContent: string, components?: ComponentKey[]): Promise<string> {
   const resolvedComponents = components || ['summary', 'flashcards', 'quiz', 'mindMap', 'studyPlan', 'revisionSheet', 'doubtSolver'];
   const truncated = truncateToTokenLimit(cleanedContent);
@@ -138,6 +381,7 @@ export async function generateGuideWithGroq(cleanedContent: string, components?:
     model: MODEL,
     max_tokens: MAX_TOKENS,
     temperature: TEMPERATURE,
+    response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

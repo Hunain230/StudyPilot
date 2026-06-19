@@ -16,12 +16,16 @@ function parseJson(value: any) {
   return value;
 }
 
+function mapGuideStatus(status: string) {
+  return status === 'completed' ? 'ready' : status;
+}
+
 // Helper: format guide for API response
 export function formatGuideResponse(guide: any) {
   if (!guide) return null;
   return {
     ...guide,
-    status: guide.status === 'completed' ? 'ready' : guide.status,
+    status: mapGuideStatus(guide.status),
     selectedComponents: parseJson(guide.selectedComponents) as string[] | null,
     content: guide.content
       ? {

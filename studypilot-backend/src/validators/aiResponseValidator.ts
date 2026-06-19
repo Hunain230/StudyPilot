@@ -25,6 +25,10 @@ export interface GeneratedGuideData {
 }
 
 export function parseAndValidateGroqResponse(rawResponse: string): GeneratedGuideData {
+  return sanitizeGuideData(parseAiJsonObject(rawResponse));
+}
+
+export function parseAiJsonObject(rawResponse: string): any {
   // Strip any accidental markdown fences
   let jsonString = rawResponse
     .replace(/^```json\s*/i, '')
@@ -34,13 +38,13 @@ export function parseAndValidateGroqResponse(rawResponse: string): GeneratedGuid
 
   let parsed: any;
   try {
-    parsed = JSON.parse(jsonString);
+    parsed = parseJsonLenient(jsonString);
   } catch (parseError) {
     // Try to extract JSON from the response if it's wrapped in text
-    const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
+    const extractedJson = extractFirstJsonObject(jsonString);
+    if (extractedJson) {
       try {
-        parsed = JSON.parse(jsonMatch[0]);
+        parsed = parseJsonLenient(extractedJson);
       } catch {
         throw new Error('AI returned malformed JSON. Please try again.');
       }
@@ -49,7 +53,98 @@ export function parseAndValidateGroqResponse(rawResponse: string): GeneratedGuid
     }
   }
 
-  return sanitizeGuideData(parsed);
+  return parsed;
+}
+
+function parseJsonLenient(jsonString: string): any {
+  const cleaned = escapeControlCharactersInsideStrings(jsonString)
+    .replace(/,\s*([}\]])/g, '$1');
+
+  return JSON.parse(cleaned);
+}
+
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') depth++;
+    if (char === '}') depth--;
+
+    if (depth === 0) {
+      return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+}
+
+function escapeControlCharactersInsideStrings(jsonString: string): string {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const char of jsonString) {
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      result += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      result += char;
+      inString = !inString;
+      continue;
+    }
+
+    if (inString && char === '\n') {
+      result += '\\n';
+      continue;
+    }
+
+    if (inString && char === '\r') {
+      result += '\\r';
+      continue;
+    }
+
+    if (inString && char === '\t') {
+      result += '\\t';
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
 }
 
 function sanitizeGuideData(data: any): GeneratedGuideData {
