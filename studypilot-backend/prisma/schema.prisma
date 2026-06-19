@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -44,9 +44,9 @@ model Guide {
   subject          String?     @db.VarChar(100)
   sourceType       SourceType  @default(notes) @map("source_type")
   sourceIdentifier String?     @map("source_identifier") @db.VarChar(512)
-  notesText        String?     @map("notes_text") @db.LongText
+  notesText        String?     @map("notes_text") @db.Text
   youtubeUrl       String?     @map("youtube_url") @db.Text
-  aiSummary           String?     @map("ai_summary") @db.LongText
+  aiSummary           String?     @map("ai_summary") @db.Text
   selectedComponents  String?     @map("selected_components") @db.VarChar(512)
   status              GuideStatus @default(pending)
   createdAt        DateTime    @default(now()) @map("created_at")
@@ -98,7 +98,7 @@ model UploadedFile {
   sizeBytes     BigInt    @map("size_bytes")
   storagePath   String    @map("storage_path") @db.VarChar(500)
   fileType      FileType  @default(other) @map("file_type")
-  extractedText String?   @map("extracted_text") @db.LongText
+  extractedText String?   @map("extracted_text") @db.Text
   createdAt     DateTime  @default(now()) @map("created_at")
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -121,10 +121,10 @@ enum FileType {
 model GuideContent {
   id              String   @id @default(uuid())
   guideId         String   @unique @map("guide_id")
-  rawContent      String   @map("raw_content") @db.LongText
-  cleanedContent  String?  @map("cleaned_content") @db.LongText
+  rawContent      String   @map("raw_content") @db.Text
+  cleanedContent  String?  @map("cleaned_content") @db.Text
   shortSummary    String?  @map("short_summary") @db.Text
-  detailedSummary String?  @map("detailed_summary") @db.LongText
+  detailedSummary String?  @map("detailed_summary") @db.Text
   keyConcepts     Json?    @map("key_concepts")
   topics          Json?
   topicHierarchy  Json?    @map("topic_hierarchy")
@@ -169,7 +169,7 @@ model QuizQuestion {
   guideId            String   @map("guide_id")
   question           String   @db.Text
   options            Json
-  correctAnswerIndex Int      @map("correct_answer_index") @db.TinyInt
+  correctAnswerIndex Int      @map("correct_answer_index")
   explanation        String?  @db.Text
   orderIndex         Int      @default(0) @map("order_index")
   createdAt          DateTime @default(now()) @map("created_at")
@@ -273,7 +273,7 @@ model Message {
   userId    String      @map("user_id")
   guideId   String?     @map("guide_id")
   role      MessageRole
-  content   String      @db.LongText
+  content   String      @db.Text
   createdAt DateTime    @default(now()) @map("created_at")
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -396,7 +396,7 @@ model DoubtSession {
   userId    String   @map("user_id")
   guideId   String?  @map("guide_id")
   question  String   @db.Text
-  answer    String   @db.LongText
+  answer    String   @db.Text
   createdAt DateTime @default(now()) @map("created_at")
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
