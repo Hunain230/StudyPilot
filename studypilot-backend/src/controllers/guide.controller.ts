@@ -22,6 +22,7 @@ export function formatGuideResponse(guide: any) {
   return {
     ...guide,
     status: guide.status === 'completed' ? 'ready' : guide.status,
+    selectedComponents: parseJson(guide.selectedComponents) as string[] | null,
     content: guide.content
       ? {
           ...guide.content,
@@ -107,11 +108,16 @@ export const getGuides = async (req: Request, res: Response, next: NextFunction)
 // POST /api/guides — create new guide (standard frontend creation)
 export const createGuide = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description, subject, sourceType, notesText, youtubeUrl } = req.body;
+    const { title, description, subject, sourceType, notesText, youtubeUrl, selectedComponents } = req.body;
 
     if (!title) {
       return res.status(400).json(ApiResponse.error('Title is required', 400));
     }
+
+    // Serialize selectedComponents array to JSON string for storage
+    const componentsStr = Array.isArray(selectedComponents) && selectedComponents.length > 0
+      ? JSON.stringify(selectedComponents)
+      : null;
 
     const guide = await prisma.guide.create({
       data: {
@@ -123,6 +129,7 @@ export const createGuide = async (req: Request, res: Response, next: NextFunctio
         notesText,
         youtubeUrl,
         status: 'processing',
+        selectedComponents: componentsStr,
       },
     });
 
@@ -136,6 +143,7 @@ export const createGuide = async (req: Request, res: Response, next: NextFunctio
         notesText,
         youtubeUrl,
         title,
+        selectedComponents: Array.isArray(selectedComponents) ? selectedComponents : undefined,
       });
     }
 
@@ -256,7 +264,7 @@ export async function generateFromPDF(req: Request, res: Response, next: NextFun
     const file = req.file;
     if (!file) return res.status(400).json(ApiResponse.error('No PDF file uploaded.', 400));
 
-    const { title } = req.body;
+    const { title, selectedComponents } = req.body;
     const userId = req.user!.userId;
 
     const { guide, cached } = await generateGuide({
@@ -264,6 +272,7 @@ export async function generateFromPDF(req: Request, res: Response, next: NextFun
       sourceType: 'pdf',
       title,
       pdfBuffer: file.buffer,
+      selectedComponents: Array.isArray(selectedComponents) ? selectedComponents : undefined,
     });
 
     return res.status(cached ? 200 : 201).json({
@@ -279,7 +288,7 @@ export async function generateFromPDF(req: Request, res: Response, next: NextFun
 // POST /api/guides/generate/notes
 export async function generateFromNotes(req: Request, res: Response, next: NextFunction) {
   try {
-    const { notes, title } = req.body;
+    const { notes, title, selectedComponents } = req.body;
     if (!notes) return res.status(400).json(ApiResponse.error('Notes content is required.', 400));
 
     const userId = req.user!.userId;
@@ -289,6 +298,7 @@ export async function generateFromNotes(req: Request, res: Response, next: NextF
       sourceType: 'notes',
       title,
       notesText: notes,
+      selectedComponents: Array.isArray(selectedComponents) ? selectedComponents : undefined,
     });
 
     return res.status(cached ? 200 : 201).json({
@@ -304,7 +314,7 @@ export async function generateFromNotes(req: Request, res: Response, next: NextF
 // POST /api/guides/generate/youtube
 export async function generateFromYouTube(req: Request, res: Response, next: NextFunction) {
   try {
-    const { url, title } = req.body;
+    const { url, title, selectedComponents } = req.body;
     if (!url) return res.status(400).json(ApiResponse.error('YouTube URL is required.', 400));
 
     const userId = req.user!.userId;
@@ -314,6 +324,7 @@ export async function generateFromYouTube(req: Request, res: Response, next: Nex
       sourceType: 'youtube',
       title,
       youtubeUrl: url,
+      selectedComponents: Array.isArray(selectedComponents) ? selectedComponents : undefined,
     });
 
     return res.status(cached ? 200 : 201).json({

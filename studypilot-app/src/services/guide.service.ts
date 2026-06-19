@@ -13,6 +13,7 @@ export const guideService = {
     sourceType?: string;
     notesText?: string;
     youtubeUrl?: string;
+    selectedComponents?: string[];
   }) {
     const { data } = await api.post('/guides', payload);
     return data.data;
@@ -21,6 +22,12 @@ export const guideService = {
   async getById(id: string) {
     const { data } = await api.get(`/guides/${id}`);
     return data.data;
+  },
+
+  async getStatus(id: string): Promise<{ status: string; id: string }> {
+    const { data } = await api.get(`/guides/${id}`);
+    const guide = data.data;
+    return { status: guide.status, id: guide.id };
   },
 
   async delete(id: string) {

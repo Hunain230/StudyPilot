@@ -46,8 +46,9 @@ model Guide {
   sourceIdentifier String?     @map("source_identifier") @db.VarChar(512)
   notesText        String?     @map("notes_text") @db.LongText
   youtubeUrl       String?     @map("youtube_url") @db.Text
-  aiSummary        String?     @map("ai_summary") @db.LongText
-  status           GuideStatus @default(pending)
+  aiSummary           String?     @map("ai_summary") @db.LongText
+  selectedComponents  String?     @map("selected_components") @db.VarChar(512)
+  status              GuideStatus @default(pending)
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 

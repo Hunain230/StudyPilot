@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import { ENV } from '../config/env';
+import type { ComponentKey } from './guideGenerationService';
 
 const groq = new Groq({
   apiKey: ENV.GROQ_API_KEY,
@@ -14,30 +15,83 @@ const MAX_INPUT_CHARS = 4000;
 
 export function truncateToTokenLimit(text: string): string {
   if (text.length <= MAX_INPUT_CHARS) return text;
-  
-  // Truncate and add a clear note
   return text.substring(0, MAX_INPUT_CHARS) + 
     '\n\n[Content truncated to fit processing limits. The above represents the main content.]';
 }
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(components: ComponentKey[]): string {
+  const needsFlashcards = components.includes('flashcards');
+  const needsQuiz = components.includes('quiz');
+  const needsRevision = components.includes('revisionSheet');
+  const needsMindMap = components.includes('mindMap');
+
+  const rules = [
+    `1. Respond ONLY with a valid JSON object. No markdown, no preamble, no explanation.`,
+    `2. Do not wrap the JSON in code blocks (\`\`\`). Return raw JSON only.`,
+    `3. All string values must be properly escaped (no unescaped quotes inside strings).`,
+    `4. Arrays must never be empty — always include at least one item.`,
+    `5. If content is insufficient for a field, provide a reasonable placeholder.`,
+    needsFlashcards
+      ? `6. Generate exactly 5 flashcards with question, answer, and difficulty.`
+      : `6. For flashcards: return an empty array [].`,
+    needsQuiz
+      ? `7. Generate exactly 3 quiz questions, multiple-choice with exactly 4 options each. Always identify the correct answer index (0-3).`
+      : `7. For quizQuestions: return an empty array [].`,
+    needsRevision
+      ? `8. Generate a concise revision sheet with 2-4 sections.`
+      : `8. For revisionSheet: return { "title": "", "sections": [] }.`,
+    needsMindMap
+      ? `9. Generate a rich, detailed topicHierarchy with at least 5 main topics, each with 2-5 subtopics, for the mind map visualization.`
+      : `9. Generate a standard topicHierarchy.`,
+    `10. Keep all text values concise to minimise output size.`,
+  ].join('\n');
+
   return `You are StudyPilot, an expert educational assistant specialising in generating comprehensive study materials.
 
 Your task is to analyse provided educational content and produce a fully structured JSON study guide.
 
 STRICT RULES:
-1. Respond ONLY with a valid JSON object. No markdown, no preamble, no explanation.
-2. Do not wrap the JSON in code blocks (\`\`\`). Return raw JSON only.
-3. All string values must be properly escaped (no unescaped quotes inside strings).
-4. Arrays must never be empty — always include at least one item.
-5. If content is insufficient for a field, provide a reasonable placeholder.
-6. Generate exactly 5 flashcards, 3 quiz questions, and a concise revision sheet.
-7. Quiz questions must be multiple-choice with exactly 4 options each.
-8. Always identify the correct answer index (0-3) for quiz questions.
-9. Keep all text values concise to minimise output size.`;
+${rules}`;
 }
 
-function buildUserPrompt(content: string): string {
+function buildUserPrompt(content: string, components: ComponentKey[]): string {
+  const needsFlashcards = components.includes('flashcards');
+  const needsQuiz = components.includes('quiz');
+  const needsRevision = components.includes('revisionSheet');
+
+  const flashcardsExample = needsFlashcards
+    ? `[
+    {
+      "question": "string",
+      "answer": "string",
+      "difficulty": "easy | medium | hard"
+    }
+  ]`
+    : `[]`;
+
+  const quizExample = needsQuiz
+    ? `[
+    {
+      "question": "string",
+      "options": ["string", "string", "string", "string"],
+      "correctAnswerIndex": 0,
+      "explanation": "string (why this answer is correct)"
+    }
+  ]`
+    : `[]`;
+
+  const revisionExample = needsRevision
+    ? `{
+    "title": "string",
+    "sections": [
+      {
+        "heading": "string",
+        "bulletPoints": ["string", "string"]
+      }
+    ]
+  }`
+    : `{ "title": "", "sections": [] }`;
+
   return `Analyse the following educational content and generate a complete study guide.
 
 CONTENT:
@@ -68,37 +122,17 @@ Return a JSON object with EXACTLY this structure (all fields required):
     "subject": "string (primary subject area)",
     "language": "string (detected language, e.g. 'English')"
   },
-  "flashcards": [
-    {
-      "question": "string",
-      "answer": "string",
-      "difficulty": "easy | medium | hard"
-    }
-  ],
-  "quizQuestions": [
-    {
-      "question": "string",
-      "options": ["string", "string", "string", "string"],
-      "correctAnswerIndex": 0,
-      "explanation": "string (why this answer is correct)"
-    }
-  ],
-  "revisionSheet": {
-    "title": "string",
-    "sections": [
-      {
-        "heading": "string",
-        "bulletPoints": ["string", "string"]
-      }
-    ]
-  }
+  "flashcards": ${flashcardsExample},
+  "quizQuestions": ${quizExample},
+  "revisionSheet": ${revisionExample}
 }`;
 }
 
-export async function generateGuideWithGroq(cleanedContent: string): Promise<string> {
+export async function generateGuideWithGroq(cleanedContent: string, components?: ComponentKey[]): Promise<string> {
+  const resolvedComponents = components || ['summary', 'flashcards', 'quiz', 'mindMap', 'studyPlan', 'revisionSheet', 'doubtSolver'];
   const truncated = truncateToTokenLimit(cleanedContent);
-  const systemPrompt = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(truncated);
+  const systemPrompt = buildSystemPrompt(resolvedComponents as ComponentKey[]);
+  const userPrompt = buildUserPrompt(truncated, resolvedComponents as ComponentKey[]);
 
   const response = await groq.chat.completions.create({
     model: MODEL,
@@ -124,23 +158,23 @@ export async function generateGuideWithGroq(cleanedContent: string): Promise<str
  */
 export async function generateGuideWithGroqRetry(
   cleanedContent: string,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  components?: ComponentKey[]
 ): Promise<string> {
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await generateGuideWithGroq(cleanedContent);
+      return await generateGuideWithGroq(cleanedContent, components);
     } catch (error: any) {
       lastError = error;
 
-      // Don't retry on non-retryable client errors (like 400 Bad Request, 401 Unauthorized, 403 Forbidden)
       if (error.status === 400 || error.status === 401 || error.status === 403 || error.status === 413) {
         throw error;
       }
 
       if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s
+        const delay = Math.pow(2, attempt) * 1000;
         console.warn(`[Groq] Attempt ${attempt} failed: ${error.message || error}. Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }

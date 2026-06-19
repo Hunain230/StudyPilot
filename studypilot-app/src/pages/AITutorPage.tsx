@@ -76,16 +76,6 @@ const ACTION_CHIPS = [
 /* ─────────────────────────────────────────
    Helpers
 ───────────────────────────────────────── */
-/*
-function formatHistory(messages: TutorHistoryMessage[]): ChatMessage[] {
-  return messages.map((m) => ({
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    createdAt: m.createdAt,
-  }));
-}
-*/
 
 /* ─────────────────────────────────────────
    CodeBlock

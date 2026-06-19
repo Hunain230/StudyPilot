@@ -60,6 +60,7 @@ interface Guide {
   sourceType: "pdf" | "youtube" | "notes";
   status: "processing" | "ready" | "failed";
   createdAt: string;
+  selectedComponents?: string[] | null;
   content?: {
     shortSummary: string;
     detailedSummary: string;
@@ -84,7 +85,7 @@ export default function GuideDetailsPage() {
   const [guide, setGuide] = useState<Guide | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"summary" | "flashcards" | "quiz" | "revision">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "flashcards" | "quiz" | "revision" | "mindmap" | "studyplan">("summary");
 
   // Flashcards state
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -100,6 +101,12 @@ export default function GuideDetailsPage() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
   const [submittingQuiz, setSubmittingQuiz] = useState(false);
+
+  // Study Plan state
+  const [examDate, setExamDate] = useState<string>("");
+  const [studyPlan, setStudyPlan] = useState<any | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === "quiz") {
@@ -354,33 +361,62 @@ export default function GuideDetailsPage() {
           <span className="material-symbols-outlined text-base">chrome_reader_mode</span>
           Study Guide
         </button>
-        <button
-          onClick={() => setActiveTab("flashcards")}
-          className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === "flashcards" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
-          }`}
-        >
-          <span className="material-symbols-outlined text-base">style</span>
-          Flashcards ({flashcards.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("quiz")}
-          className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === "quiz" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
-          }`}
-        >
-          <span className="material-symbols-outlined text-base">quiz</span>
-          Practice Quiz ({guide.quizQuestions?.length || 0})
-        </button>
-        <button
-          onClick={() => setActiveTab("revision")}
-          className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === "revision" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
-          }`}
-        >
-          <span className="material-symbols-outlined text-base">list_alt</span>
-          Revision Notes
-        </button>
+        {flashcards && flashcards.length > 0 && (
+          <button
+            onClick={() => setActiveTab("flashcards")}
+            className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "flashcards" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">style</span>
+            Flashcards ({flashcards.length})
+          </button>
+        )}
+        {guide.quizQuestions && guide.quizQuestions.length > 0 && (
+          <button
+            onClick={() => setActiveTab("quiz")}
+            className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "quiz" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">quiz</span>
+            Practice Quiz ({guide.quizQuestions.length})
+          </button>
+        )}
+        {guide.revisionSheet && guide.revisionSheet.sections && guide.revisionSheet.sections.length > 0 && (
+          <button
+            onClick={() => setActiveTab("revision")}
+            className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "revision" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">list_alt</span>
+            Revision Notes
+          </button>
+        )}
+        {guide.content?.topicHierarchy && guide.content.topicHierarchy.length > 0 &&
+         guide.selectedComponents?.includes("mindMap") && (
+          <button
+            onClick={() => setActiveTab("mindmap")}
+            className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "mindmap" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">account_tree</span>
+            Mind Map
+          </button>
+        )}
+        {guide.selectedComponents?.includes("studyPlan") && (
+          <button
+            onClick={() => setActiveTab("studyplan")}
+            className={`px-5 py-3 font-label text-label-md border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "studyplan" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">calendar_month</span>
+            Study Plan
+          </button>
+        )}
       </nav>
 
       {/* Main Workspace Area */}
@@ -819,7 +855,513 @@ export default function GuideDetailsPage() {
             </div>
           </div>
         )}
+
+        {/* Tab 5: Mind Map */}
+        {activeTab === "mindmap" && guide.content?.topicHierarchy && (
+          <MindMapView
+            subject={guide.subject || guide.content.metadata?.subject || "Study Guide"}
+            topicHierarchy={guide.content.topicHierarchy}
+          />
+        )}
+
+        {/* Tab 6: Study Plan */}
+        {activeTab === "studyplan" && (
+          <StudyPlanView
+            guideId={guide.id}
+            topics={guide.content?.topics || []}
+            examDate={examDate}
+            setExamDate={setExamDate}
+            studyPlan={studyPlan}
+            setStudyPlan={setStudyPlan}
+            loadingPlan={loadingPlan}
+            setLoadingPlan={setLoadingPlan}
+            planError={planError}
+            setPlanError={setPlanError}
+          />
+        )}
       </main>
+    </div>
+  );
+}
+
+/* ── Study Plan Component ────────────────────────────────────────────────── */
+
+interface StudyPlanViewProps {
+  guideId: string;
+  topics: string[];
+  examDate: string;
+  setExamDate: (v: string) => void;
+  studyPlan: any | null;
+  setStudyPlan: (v: any) => void;
+  loadingPlan: boolean;
+  setLoadingPlan: (v: boolean) => void;
+  planError: string | null;
+  setPlanError: (v: string | null) => void;
+}
+
+const SESSION_TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
+  STUDY:      { bg: "bg-primary/10",    text: "text-primary",   icon: "menu_book" },
+  REVIEW:     { bg: "bg-secondary/10",  text: "text-secondary", icon: "replay" },
+  QUIZ:       { bg: "bg-tertiary/10",   text: "text-tertiary",  icon: "quiz" },
+  FLASHCARDS: { bg: "bg-green-500/10",  text: "text-green-600", icon: "style" },
+};
+
+function StudyPlanView({
+  guideId, examDate, setExamDate,
+  studyPlan, setStudyPlan, loadingPlan, setLoadingPlan, planError, setPlanError,
+}: StudyPlanViewProps) {
+  const today = new Date();
+  const minDate = new Date(today.getTime() + 2 * 86400000).toISOString().split("T")[0];
+
+  const generatePlan = async () => {
+    if (!examDate) { setPlanError("Please pick your exam date first."); return; }
+    setPlanError(null);
+    setLoadingPlan(true);
+    try {
+      const { api } = await import("../lib/axios");
+      const { data } = await api.get(`/v1/planner/suggest`, {
+        params: { guideId, examDate },
+      });
+      setStudyPlan(data);
+    } catch (err: any) {
+      setPlanError(err.response?.data?.error?.message || "Failed to generate study plan. Please try again.");
+    } finally {
+      setLoadingPlan(false);
+    }
+  };
+
+  const formatDay = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  };
+
+  const totalSessions = studyPlan?.suggestedPlan?.reduce((sum: number, day: any) => sum + (day.sessions?.length || 0), 0) || 0;
+  const totalMins = studyPlan?.suggestedPlan?.reduce((sum: number, day: any) =>
+    sum + (day.sessions?.reduce((s: number, sess: any) => s + (sess.durationMinutes || 0), 0) || 0), 0) || 0;
+
+  return (
+    <div className="w-full max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-8">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
+        </div>
+        <div>
+          <h3 className="font-headline text-headline-md font-bold text-on-surface">AI Study Plan</h3>
+          <p className="text-body-sm text-on-surface-variant mt-1">
+            Enter your exam date and let AI build a personalised 7-day schedule targeting your weak areas.
+          </p>
+        </div>
+      </div>
+
+      {/* Exam Date Input */}
+      <div className="glass-card rounded-3xl p-6 border border-outline-variant/30 mb-6">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-label-md font-label font-semibold text-on-surface-variant mb-2">
+              Exam Date
+            </label>
+            <input
+              type="date"
+              min={minDate}
+              value={examDate}
+              onChange={e => setExamDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border-2 border-outline-variant bg-surface-container-low focus:border-primary focus:bg-surface-container outline-none font-body text-on-surface transition-all"
+            />
+          </div>
+          <button
+            onClick={generatePlan}
+            disabled={loadingPlan || !examDate}
+            className="px-6 py-3.5 bg-gradient-to-r from-primary to-secondary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
+          >
+            {loadingPlan ? (
+              <>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                Generate Plan
+              </>
+            )}
+          </button>
+        </div>
+        {planError && (
+          <p className="mt-3 text-label-sm text-red-500 flex items-center gap-1 font-label">
+            <span className="material-symbols-outlined text-sm">error</span>
+            {planError}
+          </p>
+        )}
+      </div>
+
+      {/* Plan Result */}
+      {studyPlan && (
+        <div className="space-y-6 animate-in">
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: "Days Until Exam", value: studyPlan.daysUntilExam ?? "—", icon: "event", color: "text-primary" },
+              { label: "Total Sessions",  value: totalSessions, icon: "checklist", color: "text-secondary" },
+              { label: "Total Study Time", value: `${Math.round(totalMins / 60)}h ${totalMins % 60}m`, icon: "schedule", color: "text-tertiary" },
+            ].map(s => (
+              <div key={s.label} className="glass-card rounded-2xl p-4 text-center border border-outline-variant/30">
+                <span className={`material-symbols-outlined ${s.color} mb-1`}>{s.icon}</span>
+                <p className={`font-headline text-headline-md font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-label-sm text-on-surface-variant font-label">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Rationale */}
+          {studyPlan.rationale && (
+            <div className="glass-card rounded-2xl p-5 border border-primary/20 bg-primary/[0.02] flex gap-4">
+              <span className="material-symbols-outlined text-primary text-2xl mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
+              <div>
+                <p className="text-label-md font-label font-bold text-primary mb-1">AI Rationale</p>
+                <p className="text-body-sm text-on-surface-variant font-body leading-relaxed">{studyPlan.rationale}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Day-by-Day Schedule */}
+          <div className="space-y-4">
+            {(studyPlan.suggestedPlan || []).map((day: any, di: number) => (
+              <div key={di} className="glass-card rounded-2xl border border-outline-variant/30 overflow-hidden">
+                {/* Day Header */}
+                <div className="bg-surface-container px-5 py-3 flex items-center justify-between border-b border-outline-variant/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center text-label-md font-bold font-label">
+                      {di + 1}
+                    </div>
+                    <span className="font-label text-label-lg font-bold text-on-surface">{formatDay(day.day)}</span>
+                  </div>
+                  <span className="text-label-sm text-on-surface-variant font-label">
+                    {day.sessions?.length || 0} session{(day.sessions?.length || 0) !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {/* Sessions */}
+                <div className="p-4 space-y-2">
+                  {(day.sessions || []).map((sess: any, si: number) => {
+                    const cfg = SESSION_TYPE_COLORS[sess.type] || SESSION_TYPE_COLORS.STUDY;
+                    return (
+                      <div key={si} className={`flex items-center gap-3 px-4 py-3 rounded-xl ${cfg.bg} border border-transparent`}>
+                        <span className={`material-symbols-outlined ${cfg.text} text-lg`}>{cfg.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-body-md font-semibold text-on-surface truncate">{sess.topic}</p>
+                          <p className={`text-label-sm font-label ${cfg.text} font-bold`}>{sess.type}</p>
+                        </div>
+                        <span className="text-label-sm text-on-surface-variant font-label whitespace-nowrap">
+                          {sess.durationMinutes} min
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Regenerate */}
+          <div className="text-center pt-2">
+            <button
+              onClick={generatePlan}
+              className="text-label-sm text-primary font-label font-bold hover:underline flex items-center gap-1 mx-auto"
+            >
+              <span className="material-symbols-outlined text-sm">refresh</span>
+              Regenerate Plan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state before generating */}
+      {!studyPlan && !loadingPlan && (
+        <div className="text-center py-16 text-on-surface-variant">
+          <span className="material-symbols-outlined text-5xl opacity-30 mb-3">event_note</span>
+          <p className="font-label text-label-lg font-semibold opacity-50">Pick your exam date above to get started</p>
+          <p className="text-body-sm opacity-30 mt-1">AI will build a personalised schedule based on your topics</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Mind Map Component ─────────────────────────────────────────────────── */
+
+interface MindMapViewProps {
+  subject: string;
+  topicHierarchy: TopicHierarchyItem[];
+}
+
+function MindMapView({ subject, topicHierarchy }: MindMapViewProps) {
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(topicHierarchy.map(t => t.topic)));
+
+  const toggleExpand = (topic: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(topic)) next.delete(topic);
+      else next.add(topic);
+      return next;
+    });
+  };
+
+  const topics = topicHierarchy.slice(0, 8); // max 8 main topics for readability
+  const centerX = 500;
+  const centerY = 350;
+  const orbitRadius = 220;
+  const subOrbitRadius = 95;
+
+  // Assign colors per topic
+  const topicColors = [
+    "#4F46E5", "#7C3AED", "#2563EB", "#059669",
+    "#D97706", "#DC2626", "#0891B2", "#9333EA"
+  ];
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="font-headline text-headline-md font-bold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">account_tree</span>
+            Mind Map
+          </h3>
+          <p className="text-body-sm text-on-surface-variant mt-1">Click topics to expand/collapse subtopics. Click nodes to highlight.</p>
+        </div>
+        <button
+          onClick={() => setExpanded(new Set(topics.map(t => t.topic)))}
+          className="text-label-sm text-primary font-label font-bold hover:underline flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">unfold_more</span>
+          Expand All
+        </button>
+      </div>
+
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-3xl border border-outline-variant/30 p-4 overflow-hidden">
+        <svg
+          viewBox="0 0 1000 700"
+          className="w-full h-auto"
+          style={{ minHeight: 400 }}
+        >
+          <defs>
+            {topicColors.map((color, i) => (
+              <radialGradient key={i} id={`tg-${i}`} cx="50%" cy="30%" r="70%">
+                <stop offset="0%" stopColor={color} stopOpacity="0.9" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.7" />
+              </radialGradient>
+            ))}
+            <radialGradient id="center-gradient" cx="50%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#4F46E5" />
+              <stop offset="100%" stopColor="#7C3AED" />
+            </radialGradient>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.15" />
+            </filter>
+          </defs>
+
+          {/* Draw connector lines first (behind nodes) */}
+          {topics.map((topicNode, i) => {
+            const angle = (i / topics.length) * 2 * Math.PI - Math.PI / 2;
+            const tx = centerX + orbitRadius * Math.cos(angle);
+            const ty = centerY + orbitRadius * Math.sin(angle);
+            const color = topicColors[i % topicColors.length];
+            const isExpanded = expanded.has(topicNode.topic);
+
+            return (
+              <g key={`lines-${i}`}>
+                {/* Center to topic line */}
+                <line
+                  x1={centerX} y1={centerY}
+                  x2={tx} y2={ty}
+                  stroke={color}
+                  strokeWidth="2"
+                  strokeOpacity="0.5"
+                  strokeDasharray={isExpanded ? "none" : "6,4"}
+                />
+                {/* Subtopic lines */}
+                {isExpanded && topicNode.subtopics.slice(0, 5).map((_, j) => {
+                  const subCount = Math.min(topicNode.subtopics.length, 5);
+                  const spread = Math.PI * 0.7;
+                  const subAngle = angle + (j - (subCount - 1) / 2) * (spread / Math.max(subCount - 1, 1));
+                  const sx = tx + subOrbitRadius * Math.cos(subAngle);
+                  const sy = ty + subOrbitRadius * Math.sin(subAngle);
+                  return (
+                    <line
+                      key={`sub-line-${j}`}
+                      x1={tx} y1={ty}
+                      x2={sx} y2={sy}
+                      stroke={color}
+                      strokeWidth="1.5"
+                      strokeOpacity="0.35"
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
+
+          {/* Subtopic nodes */}
+          {topics.map((topicNode, i) => {
+            const angle = (i / topics.length) * 2 * Math.PI - Math.PI / 2;
+            const tx = centerX + orbitRadius * Math.cos(angle);
+            const ty = centerY + orbitRadius * Math.sin(angle);
+            const color = topicColors[i % topicColors.length];
+            const isExpanded = expanded.has(topicNode.topic);
+
+            return isExpanded ? topicNode.subtopics.slice(0, 5).map((sub, j) => {
+              const subCount = Math.min(topicNode.subtopics.length, 5);
+              const spread = Math.PI * 0.7;
+              const subAngle = angle + (j - (subCount - 1) / 2) * (spread / Math.max(subCount - 1, 1));
+              const sx = tx + subOrbitRadius * Math.cos(subAngle);
+              const sy = ty + subOrbitRadius * Math.sin(subAngle);
+              const isSelected = selectedTopic === sub;
+              const maxChars = 14;
+              const label = sub.length > maxChars ? sub.slice(0, maxChars) + "…" : sub;
+
+              return (
+                <g
+                  key={`sub-${i}-${j}`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSelectedTopic(isSelected ? null : sub)}
+                >
+                  <circle
+                    cx={sx} cy={sy} r={28}
+                    fill={isSelected ? color : "white"}
+                    stroke={color}
+                    strokeWidth="2"
+                    filter="url(#shadow)"
+                  />
+                  <text
+                    x={sx} y={sy - 2}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="8"
+                    fontWeight="600"
+                    fill={isSelected ? "white" : color}
+                    fontFamily="system-ui, sans-serif"
+                  >
+                    {label.split(" ").map((word, wi) => (
+                      <tspan key={wi} x={sx} dy={wi === 0 ? 0 : 10}>{word}</tspan>
+                    ))}
+                  </text>
+                </g>
+              );
+            }) : null;
+          })}
+
+          {/* Main topic nodes */}
+          {topics.map((topicNode, i) => {
+            const angle = (i / topics.length) * 2 * Math.PI - Math.PI / 2;
+            const tx = centerX + orbitRadius * Math.cos(angle);
+            const ty = centerY + orbitRadius * Math.sin(angle);
+            const color = topicColors[i % topicColors.length];
+            const isSelected = selectedTopic === topicNode.topic;
+            const isExpanded = expanded.has(topicNode.topic);
+            const maxChars = 16;
+            const label = topicNode.topic.length > maxChars ? topicNode.topic.slice(0, maxChars) + "…" : topicNode.topic;
+
+            return (
+              <g
+                key={`topic-${i}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  setSelectedTopic(isSelected ? null : topicNode.topic);
+                  toggleExpand(topicNode.topic);
+                }}
+              >
+                <circle
+                  cx={tx} cy={ty} r={42}
+                  fill={`url(#tg-${i % topicColors.length})`}
+                  filter="url(#shadow)"
+                  stroke={isSelected ? "white" : "none"}
+                  strokeWidth="3"
+                  opacity={isExpanded ? 1 : 0.75}
+                />
+                <text
+                  textAnchor="middle"
+                  fontFamily="system-ui, sans-serif"
+                  fill="white"
+                  fontWeight="700"
+                >
+                  {label.split(" ").map((word, wi, arr) => (
+                    <tspan
+                      key={wi}
+                      x={tx}
+                      dy={wi === 0 ? `${-(arr.length - 1) * 5}` : "11"}
+                      fontSize="9.5"
+                    >
+                      {word}
+                    </tspan>
+                  ))}
+                </text>
+                {/* Subtopic count badge */}
+                {topicNode.subtopics.length > 0 && (
+                  <g>
+                    <circle cx={tx + 30} cy={ty - 30} r={12} fill="white" stroke={color} strokeWidth="1.5" />
+                    <text x={tx + 30} y={ty - 30} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill={color} fontWeight="700">
+                      {topicNode.subtopics.length}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Center node */}
+          <g style={{ cursor: "default" }}>
+            <circle cx={centerX} cy={centerY} r={60} fill="url(#center-gradient)" filter="url(#shadow)" />
+            <circle cx={centerX} cy={centerY} r={55} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+            <text
+              textAnchor="middle"
+              fontFamily="system-ui, sans-serif"
+              fill="white"
+              fontWeight="700"
+            >
+              {subject.split(" ").slice(0, 3).map((word, wi, arr) => (
+                <tspan
+                  key={wi}
+                  x={centerX}
+                  dy={wi === 0 ? `${-(arr.length - 1) * 7}` : "14"}
+                  fontSize={arr.length > 1 ? "11" : "13"}
+                >
+                  {word}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        </svg>
+      </div>
+
+      {/* Selected topic details panel */}
+      {selectedTopic && (() => {
+        const found = topicHierarchy.find(t => t.topic === selectedTopic || t.subtopics.includes(selectedTopic));
+        const isMainTopic = topicHierarchy.some(t => t.topic === selectedTopic);
+        const mainTopic = isMainTopic ? topicHierarchy.find(t => t.topic === selectedTopic) : found;
+        return (
+          <div className="mt-4 glass-card p-6 rounded-2xl border border-primary/20 bg-primary/[0.02] animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-headline text-body-lg font-bold text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined">hub</span>
+                {selectedTopic}
+              </h4>
+              <button onClick={() => setSelectedTopic(null)} className="text-on-surface-variant hover:text-on-surface">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {mainTopic && mainTopic.subtopics.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {mainTopic.subtopics.map((sub, i) => (
+                  <span key={i} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-label-sm font-label">{sub}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

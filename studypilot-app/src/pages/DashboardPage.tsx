@@ -5,6 +5,7 @@ import type { OverviewStats, QuizTrendData, WeakTopicItem, ScorePrediction } fro
 import { guideService } from "../services/guide.service";
 import type { UserProfile } from "../components/layout/DashboardLayout";
 import { useStreak } from "../hooks/useStreak";
+import { streakService } from "../services/streak.service";
 
 export default function DashboardPage() {
   const { user } = useOutletContext<{ user: UserProfile }>();
@@ -26,6 +27,9 @@ export default function DashboardPage() {
   const [predictionError, setPredictionError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Record activity on every dashboard visit to keep streak alive
+    streakService.recordActivity();
+
     const loadData = async () => {
       try {
         setLoading(true);
@@ -208,34 +212,34 @@ export default function DashboardPage() {
           {
             icon: "timer",
             label: "Study Time",
-            value: `${overview?.totalStudyMinutes || 0}m`,
+            value: guides.length === 0 ? "—" : `${overview?.totalStudyMinutes || 0}m`,
             iconBg: "bg-primary-fixed",
             iconColor: "text-primary",
-            desc: "Minutes spent in sessions"
+            desc: guides.length === 0 ? "No guides uploaded yet" : "Minutes spent in sessions"
           },
           {
             icon: "quiz",
             label: "Quiz Avg Score",
-            value: `${overview?.averageQuizScore || 0}%`,
+            value: (guides.length === 0 || !overview?.totalQuizAttempts) ? "—" : `${overview?.averageQuizScore || 0}%`,
             iconBg: "bg-secondary-fixed",
             iconColor: "text-secondary",
-            desc: `Across ${overview?.totalQuizAttempts || 0} attempts`
+            desc: (guides.length === 0 || !overview?.totalQuizAttempts) ? "No quiz attempts yet" : `Across ${overview?.totalQuizAttempts || 0} attempts`
           },
           {
             icon: "style",
             label: "Flashcards Mastered",
-            value: `${overview?.masteredCards || 0}/${overview?.totalFlashcardsReviewed || 0}`,
+            value: (guides.length === 0 || !overview?.totalFlashcardsReviewed) ? "—" : `${overview?.masteredCards || 0}/${overview?.totalFlashcardsReviewed || 0}`,
             iconBg: "bg-tertiary-fixed",
             iconColor: "text-tertiary",
-            desc: "Cards with 2+ repetitions"
+            desc: (guides.length === 0 || !overview?.totalFlashcardsReviewed) ? "No flashcards reviewed yet" : "Cards with 2+ repetitions"
           },
           {
             icon: "local_fire_department",
             label: "Study Streak",
-            value: `${streak.current} Day${streak.current === 1 ? "" : "s"}`,
+            value: guides.length === 0 ? "—" : `${streak.current} Day${streak.current === 1 ? "" : "s"}`,
             iconBg: "bg-error/10",
             iconColor: "text-error",
-            desc: `Longest streak: ${streak.longest} day${streak.longest === 1 ? "" : "s"}`
+            desc: guides.length === 0 ? "Start a streak by studying" : `Longest streak: ${streak.longest} day${streak.longest === 1 ? "" : "s"}`
           }
         ].map(card => (
           <div key={card.label} className="glass-card p-6 rounded-3xl flex flex-col justify-between hover:translate-y-[-2px] transition-transform">
