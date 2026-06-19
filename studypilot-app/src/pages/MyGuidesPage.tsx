@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { guideService } from "../services/guide.service";
 
 export interface GuideListItem {
@@ -23,6 +23,7 @@ export default function MyGuidesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
   const [selectedSort, setSelectedSort] = useState("Sort: Newest");
+  const [exportingGuides, setExportingGuides] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchGuides = async () => {
@@ -49,6 +50,40 @@ export default function MyGuidesPage() {
         console.error(err);
         alert("Failed to delete the study guide.");
       }
+    }
+  };
+
+  const getExportFilename = (title: string) => {
+    const safeTitle = title
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+
+    return `StudyPilot-Guide-${safeTitle || "Study-Guide"}.pdf`;
+  };
+
+  const handleExportPdf = async (event: MouseEvent<HTMLButtonElement>, guide: GuideListItem) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (guide.status !== "ready" || exportingGuides[guide.id]) return;
+
+    try {
+      setExportingGuides(prev => ({ ...prev, [guide.id]: true }));
+      const blob = await guideService.exportPdf(guide.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = getExportFilename(guide.title);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export the study guide PDF. Please try again.");
+    } finally {
+      setExportingGuides(prev => ({ ...prev, [guide.id]: false }));
     }
   };
 
@@ -179,6 +214,7 @@ export default function MyGuidesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {processedGuides.map((g) => {
             const isCompleted = g.status === "ready";
+            const isExporting = !!exportingGuides[g.id];
             const progress = g.status === "ready" ? 100 : g.status === "failed" ? 0 : 30;
             const subjectColor = getSubjectColor(g.subject);
             
@@ -256,8 +292,20 @@ export default function MyGuidesPage() {
                       <span className="material-symbols-outlined text-base">play_arrow</span>
                       Study Guide
                     </Link>
-                    <button className="p-2.5 border border-outline-variant rounded-xl hover:bg-white transition-all text-on-surface-variant" title="Export PDF">
-                      <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                    <button
+                      onClick={(event) => handleExportPdf(event, g)}
+                      disabled={!isCompleted || isExporting}
+                      className={`p-2.5 border border-outline-variant rounded-xl transition-all text-on-surface-variant ${
+                        isCompleted
+                          ? "hover:bg-white"
+                          : "opacity-45 cursor-not-allowed"
+                      } disabled:cursor-not-allowed`}
+                      title={isCompleted ? "Export PDF" : "Export is available when the guide is ready"}
+                      aria-label={`Export ${g.title} as PDF`}
+                    >
+                      <span className={`material-symbols-outlined text-xl ${isExporting ? "animate-spin" : ""}`}>
+                        {isExporting ? "progress_activity" : "picture_as_pdf"}
+                      </span>
                     </button>
                   </div>
                 </div>

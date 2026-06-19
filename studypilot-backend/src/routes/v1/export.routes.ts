@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authGuard } from '../../middleware/authGuard';
 import {
+  exportGuideContent,
   exportGuideReport,
   exportQuizAttemptReport,
   exportAnalyticsReport,
@@ -9,6 +10,7 @@ import {
 const router = Router();
 router.use(authGuard);
 
+router.get('/guide/:guideId/content', exportGuideContent);
 router.get('/guide/:guideId', exportGuideReport);
 router.get('/quiz/:attemptId', exportQuizAttemptReport);
 router.get('/analytics', exportAnalyticsReport);

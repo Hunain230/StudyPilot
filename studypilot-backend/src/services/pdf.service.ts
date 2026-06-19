@@ -7,7 +7,10 @@ import { Response } from 'express';
 export function streamPDF(
   res: Response,
   filename: string,
-  builder: (doc: InstanceType<typeof PDFDocument>) => void
+  builder: (doc: InstanceType<typeof PDFDocument>) => void,
+  options?: {
+    subtitle?: string;
+  }
 ) {
   const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
@@ -18,7 +21,7 @@ export function streamPDF(
   // Core Header
   doc.fontSize(22).fillColor('#2563eb').text('StudyPilot AI', { align: 'center' });
   doc.moveDown(0.3);
-  doc.fontSize(9).fillColor('#64748b').text(`Academic Performance Report • Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+  doc.fontSize(9).fillColor('#64748b').text(options?.subtitle || `Academic Performance Report - Generated: ${new Date().toLocaleString()}`, { align: 'center' });
   doc.moveDown(0.8);
   doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#e2e8f0').lineWidth(1).stroke();
   doc.moveDown(1);

@@ -8,7 +8,6 @@ import { notificationService } from "../services/notification.service";
 import { streakService } from "../services/streak.service";
 import type {
   TutorAskMode,
-  TutorHistoryMessage,
   TutorMode,
   TutorSource,
 } from "../services/tutor.service";
@@ -77,6 +76,7 @@ const ACTION_CHIPS = [
 /* ─────────────────────────────────────────
    Helpers
 ───────────────────────────────────────── */
+/*
 function formatHistory(messages: TutorHistoryMessage[]): ChatMessage[] {
   return messages.map((m) => ({
     id: m.id,
@@ -85,6 +85,7 @@ function formatHistory(messages: TutorHistoryMessage[]): ChatMessage[] {
     createdAt: m.createdAt,
   }));
 }
+*/
 
 /* ─────────────────────────────────────────
    CodeBlock

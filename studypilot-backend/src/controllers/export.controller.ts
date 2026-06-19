@@ -6,6 +6,156 @@ import { computeReadiness, getReadinessStatus } from '../services/readiness.serv
 import { computeWeakTopics } from '../services/weakTopic.service';
 import { getQuestionTopic } from '../services/weakTopic.service';
 
+type KeyConcept = {
+  term?: string;
+  definition?: string;
+};
+
+type TopicHierarchyItem = {
+  topic?: string;
+  subtopics?: string[];
+};
+
+function parseJson(value: any) {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function asArray<T>(value: any): T[] {
+  const parsed = parseJson(value);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function safePdfFilename(title: string) {
+  const safeTitle = title
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 60);
+
+  return `StudyPilot-Guide-${safeTitle || 'Study-Guide'}.pdf`;
+}
+
+// GET /api/v1/export/guide/:guideId/content
+export async function exportGuideContent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { guideId } = req.params;
+    const userId = req.user!.userId;
+
+    const guide = await prisma.guide.findFirst({
+      where: { id: guideId, userId },
+      include: {
+        content: true,
+      },
+    });
+
+    if (!guide) {
+      return res.status(404).json(ApiResponse.error('Guide not found', 404));
+    }
+
+    const content = guide.content;
+    const keyConcepts = asArray<KeyConcept>(content?.keyConcepts);
+    const topicHierarchy = asArray<TopicHierarchyItem>(content?.topicHierarchy);
+    const metadata = parseJson(content?.metadata) || {};
+    const filename = safePdfFilename(guide.title);
+
+    streamPDF(
+      res,
+      filename,
+      (doc) => {
+        doc.fontSize(18).fillColor('#0f172a').font('Helvetica-Bold').text(guide.title, { width: 495 });
+        doc.moveDown(0.3);
+        doc.fontSize(10).fillColor('#4b5563').font('Helvetica');
+        doc.text(`Subject: ${guide.subject || metadata.subject || 'General'}`);
+        doc.text(`Source Type: ${guide.sourceType.toUpperCase()}`);
+        doc.text(`Created: ${guide.createdAt.toLocaleDateString()}`);
+        if (metadata.estimatedReadingTime || metadata.difficulty || metadata.wordCount) {
+          doc.text(
+            `Reading Time: ${metadata.estimatedReadingTime || 'N/A'} | Difficulty: ${metadata.difficulty || 'N/A'} | Words: ${metadata.wordCount || 'N/A'}`
+          );
+        }
+        if (guide.description) {
+          doc.moveDown(0.5);
+          doc.fillColor('#374151').font('Helvetica-Oblique').text(guide.description, { width: 495 });
+        }
+
+        addSection(doc, 'Key Summary');
+        if (content?.shortSummary) {
+          doc.fontSize(10).fillColor('#334155').font('Helvetica').text(content.shortSummary, {
+            align: 'justify',
+            width: 495,
+          });
+        } else {
+          doc.text('No key summary was generated for this guide.');
+        }
+
+        addSection(doc, 'Detailed Explanations');
+        if (content?.detailedSummary) {
+          doc.fontSize(10).fillColor('#334155').font('Helvetica').text(content.detailedSummary, {
+            align: 'justify',
+            width: 495,
+          });
+        } else {
+          doc.text('No detailed explanation was generated for this guide.');
+        }
+
+        addSection(doc, 'Key Concepts');
+        if (keyConcepts.length > 0) {
+          keyConcepts.forEach((concept, index) => {
+            const term = concept.term || `Concept ${index + 1}`;
+            doc.fontSize(10).fillColor('#0f172a').font('Helvetica-Bold').text(term, { width: 495 });
+            doc.fontSize(9).fillColor('#334155').font('Helvetica').text(concept.definition || 'No definition provided.', {
+              width: 495,
+            });
+            doc.moveDown(0.6);
+          });
+        } else {
+          doc.fontSize(10).fillColor('#334155').font('Helvetica').text('No key concepts were generated for this guide.');
+        }
+
+        addSection(doc, 'Topic Outline');
+        if (topicHierarchy.length > 0) {
+          topicHierarchy.forEach((topicNode, index) => {
+            doc.fontSize(10).fillColor('#0f172a').font('Helvetica-Bold').text(`${index + 1}. ${topicNode.topic || 'Untitled Topic'}`, {
+              width: 495,
+            });
+
+            const subtopics = Array.isArray(topicNode.subtopics) ? topicNode.subtopics : [];
+            if (subtopics.length > 0) {
+              subtopics.forEach((subtopic) => {
+                doc.fontSize(9).fillColor('#334155').font('Helvetica').text(`- ${subtopic}`, {
+                  indent: 15,
+                  width: 480,
+                });
+              });
+            }
+            doc.moveDown(0.6);
+          });
+        } else {
+          const topics = asArray<string>(content?.topics);
+          if (topics.length > 0) {
+            topics.forEach((topic) => {
+              doc.fontSize(9).fillColor('#334155').font('Helvetica').text(`- ${topic}`, { width: 495 });
+            });
+          } else {
+            doc.fontSize(10).fillColor('#334155').font('Helvetica').text('No topic outline was generated for this guide.');
+          }
+        }
+      },
+      {
+        subtitle: `Study Guide Export - Generated: ${new Date().toLocaleString()}`,
+      }
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/v1/export/guide/:guideId
 export async function exportGuideReport(req: Request, res: Response, next: NextFunction) {
   try {

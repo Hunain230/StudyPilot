@@ -27,4 +27,11 @@ export const guideService = {
     const { data } = await api.delete(`/guides/${id}`);
     return data.data;
   },
+
+  async exportPdf(id: string) {
+    const { data } = await api.get(`/v1/export/guide/${id}/content`, {
+      responseType: 'blob',
+    });
+    return data as Blob;
+  },
 };
