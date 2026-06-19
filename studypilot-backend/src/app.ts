@@ -16,7 +16,22 @@ import v1Router from './routes/v1';
 const app = express();
 
 // ── Middleware ────────────────────────────────────
-app.use(cors({ origin: ENV.FRONTEND_ORIGIN, credentials: true }));
+const allowedOrigins = [
+  ENV.FRONTEND_ORIGIN,
+  'https://study-pilot-zeta.vercel.app',
+  'http://localhost:5173'
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
