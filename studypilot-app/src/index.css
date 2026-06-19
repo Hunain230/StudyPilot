@@ -311,8 +311,6 @@
   box-shadow: 0 12px 24px -10px rgba(59, 130, 246, 0.15);
 }
 
-
-
 /* Scrollbar dark mode */
 .dark ::-webkit-scrollbar-thumb {
   background: rgb(var(--color-outline-variant));
@@ -321,9 +319,9 @@
   background: rgb(var(--color-outline));
 }
 
-/* Dynamic CSS Overrides for Tailwind classes with hardcoded light-mode values */
-.dark input, 
-.dark select, 
+/* ─── Form inputs ─────────────────────────────── */
+.dark input,
+.dark select,
 .dark textarea {
   color: rgb(var(--color-on-surface)) !important;
 }
@@ -333,31 +331,129 @@
   color: rgb(var(--color-on-surface)) !important;
 }
 
-/* Match Tailwind hex colors and map to variable-driven dark theme values */
-.dark [class*="bg-[#F1F5F9]"],
-.dark [class*="bg-[#f1f5f9]"] {
-  background-color: rgb(var(--color-surface-container-low)) !important;
-}
-
-.dark [class*="focus:bg-white"]:focus {
+/* ─── Hardcoded bg-white variants ────────────────────────── */
+/* Standalone bg-white only (not bg-white/40 etc — handled below) */
+.dark .bg-white {
   background-color: rgb(var(--color-surface-container-lowest)) !important;
 }
-
-.dark [class*="bg-white/40"] {
-  background-color: rgba(11, 12, 15, 0.4) !important;
+/* Exception: text-white on buttons/badges must stay white */
+.dark [class*="text-white"] {
+  color: #fff !important;
 }
 
-.dark [class*="bg-white/70"] {
-  background-color: rgba(11, 12, 15, 0.7) !important;
-}
-
-.dark [class*="hover:bg-slate-50"]:hover {
+/* ─── Light slate / zinc backgrounds ────────────────────── */
+.dark [class*="bg-[#F1F5F9]"],
+.dark [class*="bg-[#f1f5f9]"],
+.dark [class*="bg-slate-50"],
+.dark [class*="bg-slate-100"],
+.dark [class*="bg-zinc-50"],
+.dark [class*="bg-zinc-100"],
+.dark [class*="bg-gray-50"],
+.dark [class*="bg-gray-100"] {
   background-color: rgb(var(--color-surface-container-low)) !important;
 }
 
-.dark [class*="bg-slate-100"] {
+/* focus state */
+.dark [class*="focus:bg-white"]:focus,
+.dark [class*="focus-within:bg-white"]:focus-within {
+  background-color: rgb(var(--color-surface-container)) !important;
+}
+
+/* ─── Transparent whites (glassmorphism) ─────────────────── */
+.dark [class*="bg-white/40"] { background-color: rgba(20, 21, 26, 0.4) !important; }
+.dark [class*="bg-white/50"] { background-color: rgba(20, 21, 26, 0.5) !important; }
+.dark [class*="bg-white/70"] { background-color: rgba(20, 21, 26, 0.7) !important; }
+.dark [class*="bg-white/80"] { background-color: rgba(20, 21, 26, 0.8) !important; }
+.dark [class*="bg-white/90"] { background-color: rgba(20, 21, 26, 0.9) !important; }
+
+/* ─── Hover slate overrides ─────────────────────────────── */
+.dark [class*="hover:bg-slate-50"]:hover,
+.dark [class*="hover:bg-gray-50"]:hover,
+.dark [class*="hover:bg-zinc-50"]:hover {
   background-color: rgb(var(--color-surface-container-low)) !important;
 }
+.dark [class*="hover:bg-slate-100"]:hover,
+.dark [class*="hover:bg-gray-100"]:hover {
+  background-color: rgb(var(--color-surface-container)) !important;
+}
+
+/* ─── Red / green / amber alert backgrounds ─────────────── */
+.dark [class*="bg-red-50"]   { background-color: rgba(239, 68, 68, 0.08)  !important; }
+.dark [class*="bg-green-50"] { background-color: rgba(34, 197, 94, 0.08)  !important; }
+.dark [class*="bg-amber-50"] { background-color: rgba(245, 158, 11, 0.08) !important; }
+.dark [class*="bg-blue-50"]  { background-color: rgba(59, 130, 246, 0.08) !important; }
+
+.dark [class*="text-red-600"]   { color: rgb(248 113 113) !important; }
+.dark [class*="text-green-600"] { color: rgb(74 222 128)  !important; }
+.dark [class*="text-amber-600"] { color: rgb(251 191 36)  !important; }
+
+/* border colours */
+.dark [class*="border-red-200"]   { border-color: rgba(239, 68, 68, 0.2)  !important; }
+.dark [class*="border-green-200"] { border-color: rgba(34, 197, 94, 0.2)  !important; }
+
+/* ─── Gradient mesh backgrounds ──────────────────────────── */
+.dark .bg-animate {
+  background: linear-gradient(-45deg, #0d0e12, #111827, #1a1040, #0a1628);
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+.dark .bg-soft-mesh {
+  background:
+    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.06) 0, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.06) 0, transparent 50%),
+    rgb(var(--color-background));
+}
+
+/* ─── Input soft (from .input-soft class) ──────────────── */
+.dark .input-soft {
+  background-color: rgb(var(--color-surface-container-low));
+  border-color: rgb(var(--color-outline-variant) / 0.3);
+}
+.dark .input-soft:focus {
+  background-color: rgb(var(--color-surface-container));
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+}
+
+/* ─── Gradient from/to light tones (SVG, mind map) ─────── */
+.dark [class*="from-slate-50"],
+.dark [class*="from-gray-50"] {
+  --tw-gradient-from: rgb(var(--color-surface-container-low)) !important;
+}
+.dark [class*="to-blue-50"] {
+  --tw-gradient-to: rgb(var(--color-surface-container)) !important;
+}
+
+/* ─── Border colours that are hardcoded ──────────────────── */
+.dark [class*="border-slate-200"],
+.dark [class*="border-gray-200"],
+.dark [class*="border-zinc-200"] {
+  border-color: rgb(var(--color-outline-variant)) !important;
+}
+
+/* ─── Text that should flip ──────────────────────────────── */
+.dark [class*="text-slate-600"],
+.dark [class*="text-gray-600"] {
+  color: rgb(var(--color-on-surface-variant)) !important;
+}
+.dark [class*="text-slate-800"],
+.dark [class*="text-gray-800"],
+.dark [class*="text-slate-900"],
+.dark [class*="text-gray-900"] {
+  color: rgb(var(--color-on-surface)) !important;
+}
+
+/* ─── Placeholder text ──────────────────────────────────── */
+.dark ::placeholder {
+  color: rgb(var(--color-on-surface-variant) / 0.4) !important;
+}
+
+/* ─── Progress bars ─────────────────────────────────────── */
+.dark [class*="bg-outline-variant"] {
+  background-color: rgb(var(--color-outline-variant)) !important;
+}
+
 
 /* ══════════════════════════════════════════════════
    StudyPilot AI Tutor — Premium Workspace (sp-*)

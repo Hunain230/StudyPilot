@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
 import type { UserProfile } from "./DashboardLayout";
 import NotificationPanel from "./NotificationPanel";
 import { useStreak } from "../../hooks/useStreak";
+import { useTheme } from "../../context/ThemeContext";
 
 interface TopBarProps {
   user: UserProfile;
@@ -10,21 +10,7 @@ interface TopBarProps {
 
 export default function TopBar({ user }: TopBarProps) {
   const streak = useStreak();
-  const [isDark, setIsDark] = useState(() => {
-    return document.documentElement.classList.contains("dark");
-  });
-
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-      setIsDark(true);
-    }
-  };
+  const { isDark, toggleTheme } = useTheme();
 
   const getInitials = (name: string) => {
     return name

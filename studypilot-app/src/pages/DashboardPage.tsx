@@ -5,6 +5,7 @@ import type { OverviewStats, QuizTrendData, WeakTopicItem, ScorePrediction } fro
 import { guideService } from "../services/guide.service";
 import type { UserProfile } from "../components/layout/DashboardLayout";
 import { useStreak } from "../hooks/useStreak";
+import { streakService } from "../services/streak.service";
 
 export default function DashboardPage() {
   const { user } = useOutletContext<{ user: UserProfile }>();
@@ -26,6 +27,9 @@ export default function DashboardPage() {
   const [predictionError, setPredictionError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Record activity on every dashboard visit to keep streak alive
+    streakService.recordActivity();
+
     const loadData = async () => {
       try {
         setLoading(true);

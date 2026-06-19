@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { authService } from "../services/auth.service";
+import { streakService } from "../services/streak.service";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await authService.login(email, password);
+      // Record activity to update streak on login
+      streakService.recordActivity();
       navigate("/dashboard");
     } catch (err: any) {
       console.error(err);

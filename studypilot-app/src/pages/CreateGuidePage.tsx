@@ -1,43 +1,145 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { guideService } from "../services/guide.service";
 import { uploadService } from "../services/upload.service";
+import { analyticsService } from "../services/analytics.service";
+import { useStreak } from "../hooks/useStreak";
 
 const tabs = ["pdf", "youtube", "notes"] as const;
 type Tab = typeof tabs[number];
 
-const recentGuides = [
-  { title: "Calculus II", stats: "24 Flashcards • 15min ago", color: "primary-container" },
-  { title: "Database Systems", stats: "12 Topics • 2h ago", color: "secondary-container" },
-  { title: "Organic Chemistry", stats: "32 Flashcards • Yesterday", color: "tertiary-container" },
+type ComponentKey = "summary" | "flashcards" | "quiz" | "mindMap" | "studyPlan" | "revisionSheet";
+
+const COMPONENT_SETTINGS: { key: ComponentKey; label: string; icon: string; iconColor: string; defaultChecked: boolean }[] = [
+  { key: "summary",      label: "Summary",        icon: "summarize",    iconColor: "text-primary",   defaultChecked: true  },
+  { key: "flashcards",   label: "Flashcards",     icon: "style",        iconColor: "text-secondary", defaultChecked: true  },
+  { key: "quiz",         label: "Quiz",            icon: "quiz",         iconColor: "text-tertiary",  defaultChecked: true  },
+  { key: "mindMap",      label: "Mind Map",        icon: "account_tree", iconColor: "text-primary",   defaultChecked: false },
+  { key: "studyPlan",    label: "Study Plan",      icon: "calendar_month", iconColor: "text-secondary", defaultChecked: false },
+  { key: "revisionSheet",label: "Revision Sheet",  icon: "description",  iconColor: "text-tertiary",  defaultChecked: false },
 ];
 
-const settings = [
-  { label: "Summary", icon: "summarize", iconColor: "text-primary", checked: true },
-  { label: "Flashcards", icon: "style", iconColor: "text-secondary", checked: true },
-  { label: "Quiz", icon: "quiz", iconColor: "text-tertiary", checked: true },
-  { label: "Mind Map", icon: "account_tree", iconColor: "text-on-surface-variant", checked: false, dimmed: true },
-  { label: "Study Plan", icon: "calendar_month", iconColor: "text-primary", checked: true },
-  { label: "Revision Sheet", icon: "description", iconColor: "text-secondary", checked: false },
-  { label: "AI Doubt Solver", icon: "psychology", iconColor: "text-tertiary", checked: true },
-];
+type StepState = "idle" | "active" | "done" | "error";
+
+interface StepperStep {
+  icon: string;
+  label: string;
+  color: string;
+  state: StepState;
+}
 
 export default function CreateGuidePage() {
   const navigate = useNavigate();
+  const streak = useStreak();
+  const pollRef = useRef<number | null>(null);
+
   const [activeTab, setActiveTab] = useState<Tab>("pdf");
   const [generating, setGenerating] = useState(false);
+  const [generatedGuideId, setGeneratedGuideId] = useState<string | null>(null);
 
   // Guide Metadata
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [subject, setSubject] = useState("");
-  
+
   // Sources
   const [notesText, setNotesText] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Component selection
+  const [selectedComponents, setSelectedComponents] = useState<ComponentKey[]>(
+    COMPONENT_SETTINGS.filter(s => s.defaultChecked).map(s => s.key)
+  );
+
+  // Stepper state
+  const [steps, setSteps] = useState<StepperStep[]>([
+    { icon: "cloud_upload", label: "Upload",          color: "bg-primary",   state: "active" },
+    { icon: "smart_toy",    label: "Processing",      color: "bg-secondary", state: "idle"   },
+    { icon: "list_alt",     label: "Topic Extraction",color: "bg-tertiary",  state: "idle"   },
+    { icon: "check_circle", label: "Completed",       color: "bg-surface-container-highest", state: "idle" },
+  ]);
+
+  // Header stats
+  const [totalGuides, setTotalGuides] = useState<number | null>(null);
+  const [learningHours, setLearningHours] = useState<number | null>(null);
+  const [recentGuides, setRecentGuides] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [guides, overview] = await Promise.all([
+          guideService.getAll(),
+          analyticsService.getOverview().catch(() => null),
+        ]);
+        setTotalGuides((guides || []).length);
+        setRecentGuides((guides || []).slice(0, 3));
+        if (overview) {
+          setLearningHours(Math.round((overview.totalStudyMinutes || 0) / 60));
+        }
+      } catch {
+        // Silently ignore stat load failures
+      }
+    };
+    loadStats();
+  }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const setStepState = (index: number, state: StepState) => {
+    setSteps(prev => prev.map((s, i) => i === index ? { ...s, state } : s));
+  };
+
+  const toggleComponent = (key: ComponentKey) => {
+    setSelectedComponents(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const startPolling = (guideId: string) => {
+    let processingActivated = false;
+
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const { status } = await guideService.getStatus(guideId);
+
+        if (status === "processing" && !processingActivated) {
+          processingActivated = true;
+          setStepState(1, "active");
+          setTimeout(() => setStepState(2, "active"), 5000);
+        }
+
+        if (status === "ready") {
+          clearInterval(pollRef.current!);
+          // Mark all steps done
+          setSteps(prev => prev.map((s, i) => ({
+            ...s,
+            state: i < 3 ? "done" : "done",
+          })));
+          setStepState(3, "done");
+          setGenerating(false);
+          // Brief pause before redirect
+          setTimeout(() => navigate(`/guides/${guideId}`), 1800);
+        }
+
+        if (status === "failed") {
+          clearInterval(pollRef.current!);
+          setStepState(1, "error");
+          setError("AI generation failed. Please try again with different content.");
+          setGenerating(false);
+        }
+      } catch {
+        // Poll silently on network errors
+      }
+    }, 2500);
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,12 +159,25 @@ export default function CreateGuidePage() {
       setError("Please enter notes or text study material.");
       return;
     }
+    if (selectedComponents.length === 0) {
+      setError("Please select at least one component to generate.");
+      return;
+    }
 
     setGenerating(true);
     setError(null);
+    setUploadProgress(0);
+
+    // Reset stepper
+    setSteps([
+      { icon: "cloud_upload", label: "Upload",          color: "bg-primary",   state: "active" },
+      { icon: "smart_toy",    label: "Processing",      color: "bg-secondary", state: "idle"   },
+      { icon: "list_alt",     label: "Topic Extraction",color: "bg-tertiary",  state: "idle"   },
+      { icon: "check_circle", label: "Completed",       color: "bg-surface-container-highest", state: "idle" },
+    ]);
 
     try {
-      // 1. Create the guide in processing state
+      // 1. Create the guide record in processing state
       const guide = await guideService.create({
         title,
         description,
@@ -70,37 +185,54 @@ export default function CreateGuidePage() {
         sourceType: activeTab,
         notesText: activeTab === "notes" ? notesText : undefined,
         youtubeUrl: activeTab === "youtube" ? youtubeUrl : undefined,
+        selectedComponents,
       });
 
-      // 2. If it's a PDF upload, upload the file
-      if (activeTab === "pdf" && selectedFile) {
-        setUploadProgress(10);
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((p) => (p < 80 ? p + 15 : p));
-        }, 300);
+      setGeneratedGuideId(guide.id);
 
-        try {
-          await uploadService.uploadFile(selectedFile, guide.id);
-          setUploadProgress(100);
-          clearInterval(interval);
-        } catch (uploadErr) {
-          clearInterval(interval);
-          throw uploadErr;
-        }
+      // 2. If PDF, upload the file with real progress tracking
+      if (activeTab === "pdf" && selectedFile) {
+        await uploadService.uploadFile(
+          selectedFile,
+          guide.id,
+          selectedComponents,
+          (percent) => setUploadProgress(percent)
+        );
+        setUploadProgress(100);
+        setStepState(0, "done");
+      } else {
+        // For notes/youtube, upload step is instant
+        setStepState(0, "done");
       }
 
-      // Simulate AI Processing time briefly for UX, then redirect
-      setTimeout(() => {
-        setGenerating(false);
-        navigate("/guides");
-      }, 1000);
+      // 3. Start polling for status
+      startPolling(guide.id);
 
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to create study guide. Please try again.");
       setGenerating(false);
+      setStepState(0, "error");
     }
+  };
+
+  const getStepClass = (state: StepState, color: string) => {
+    if (state === "done") return "bg-green-500";
+    if (state === "error") return "bg-red-500";
+    if (state === "active") return color;
+    return "bg-surface-container-highest";
+  };
+
+  const getStepIcon = (step: StepperStep) => {
+    if (step.state === "done") return "check_circle";
+    if (step.state === "error") return "error";
+    return step.icon;
+  };
+
+  const getConnectorClass = (leftState: StepState) => {
+    if (leftState === "done") return "bg-green-400";
+    if (leftState === "active") return "bg-primary/60 animate-pulse";
+    return "bg-outline-variant";
   };
 
   return (
@@ -115,37 +247,42 @@ export default function CreateGuidePage() {
           <div className="hidden lg:flex gap-4">
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Total Guides</p>
-              <p className="font-headline text-headline-md text-primary">24</p>
+              <p className="font-headline text-headline-md text-primary">
+                {totalGuides !== null ? totalGuides : <span className="animate-pulse">—</span>}
+              </p>
             </div>
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Study Streak</p>
-              <p className="font-headline text-headline-md text-secondary">7 Days</p>
+              <p className="font-headline text-headline-md text-secondary">
+                {streak.current} Day{streak.current !== 1 ? "s" : ""}
+              </p>
             </div>
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Learning Hours</p>
-              <p className="font-headline text-headline-md text-tertiary">48h</p>
+              <p className="font-headline text-headline-md text-tertiary">
+                {learningHours !== null ? `${learningHours}h` : <span className="animate-pulse">—</span>}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* AI Workflow */}
+        {/* AI Workflow Stepper */}
         <div className="w-full bg-surface-container-low rounded-2xl p-6 border border-outline-variant/30 flex items-center justify-around relative overflow-hidden">
-          {[
-            { icon: "cloud_upload", label: "Upload", color: "bg-primary", active: true },
-            { icon: "smart_toy", label: "Processing", color: "bg-secondary", active: generating },
-            { icon: "list_alt", label: "Topic Extraction", color: "bg-tertiary", active: false },
-            { icon: "check_circle", label: "Completed", color: "bg-surface-container-highest", active: false },
-          ].map((step, i, arr) => (
+          {steps.map((step, i, arr) => (
             <div key={step.label} className="flex items-center flex-1">
-              <div className={`flex flex-col items-center gap-2 z-10 ${!step.active ? "opacity-50" : ""}`}>
-                <div className={`w-12 h-12 rounded-full ${step.color} flex items-center justify-center ${step.active ? "text-white" : "text-on-surface-variant"}`}>
-                  <span className="material-symbols-outlined">{step.icon}</span>
+              <div className={`flex flex-col items-center gap-2 z-10 ${step.state === "idle" ? "opacity-40" : ""} transition-opacity duration-500`}>
+                <div className={`w-12 h-12 rounded-full ${getStepClass(step.state, step.color)} flex items-center justify-center transition-all duration-500 ${step.state === "active" ? "shadow-lg ring-2 ring-offset-2 ring-primary/30 animate-pulse" : ""}`}>
+                  <span className={`material-symbols-outlined ${step.state === "idle" ? "text-on-surface-variant" : "text-white"}`} style={{ fontVariationSettings: step.state === "done" ? "'FILL' 1" : "'FILL' 0" }}>
+                    {getStepIcon(step)}
+                  </span>
                 </div>
-                <span className="text-label-md font-medium font-label">{step.label}</span>
+                <span className={`text-label-md font-medium font-label ${step.state === "active" ? "text-primary font-bold" : step.state === "done" ? "text-green-600 font-bold" : ""}`}>
+                  {step.label}
+                </span>
               </div>
               {i < arr.length - 1 && (
-                <div className="flex-1 h-px bg-outline-variant mx-4 relative z-10">
-                  {i === 0 && generating && <div className="absolute inset-0 bg-primary w-full origin-left animate-pulse-gentle" />}
+                <div className="flex-1 h-1 mx-4 rounded-full overflow-hidden bg-outline-variant/30">
+                  <div className={`h-full rounded-full transition-all duration-700 ${getConnectorClass(step.state)}`} style={{ width: step.state === "done" ? "100%" : step.state === "active" ? "60%" : "0%" }} />
                 </div>
               )}
             </div>
@@ -154,7 +291,8 @@ export default function CreateGuidePage() {
       </section>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl border border-red-200/50 mb-6 font-body font-medium">
+        <div className="bg-red-50 text-red-600 p-4 rounded-2xl border border-red-200/50 mb-6 font-body font-medium flex items-center gap-3">
+          <span className="material-symbols-outlined">error</span>
           {error}
         </div>
       )}
@@ -247,6 +385,7 @@ export default function CreateGuidePage() {
                     {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "or browse files from your computer"}
                   </p>
                 </label>
+                {/* Upload Progress Bar */}
                 {selectedFile && uploadProgress > 0 && (
                   <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/50">
                     <div className="flex justify-between items-center mb-2">
@@ -254,11 +393,13 @@ export default function CreateGuidePage() {
                         <span className="material-symbols-outlined text-error">picture_as_pdf</span>
                         <span className="text-body-md font-medium font-body">{selectedFile.name}</span>
                       </div>
-                      <span className="text-label-md text-primary font-label">{uploadProgress}%</span>
+                      <span className={`text-label-md font-label font-bold ${uploadProgress >= 100 ? "text-green-600" : "text-primary"}`}>
+                        {uploadProgress >= 100 ? "✓ Uploaded" : `${uploadProgress}%`}
+                      </span>
                     </div>
-                    <div className="w-full bg-outline-variant/30 h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-outline-variant/30 h-2 rounded-full overflow-hidden">
                       <div 
-                        className="bg-primary h-full rounded-full transition-all duration-500" 
+                        className={`h-full rounded-full transition-all duration-300 ${uploadProgress >= 100 ? "bg-green-500" : "bg-primary"}`}
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -312,27 +453,66 @@ export default function CreateGuidePage() {
             )}
           </div>
 
-          {/* Preview Panel */}
+          {/* Estimated Output Panel */}
           <div className="bg-surface-container p-8 rounded-3xl border border-outline-variant shadow-sm relative overflow-hidden">
             <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
             <h3 className="font-headline text-headline-md mb-6 flex items-center gap-3">
               <span className="material-symbols-outlined text-primary">visibility</span>
               Estimated Output
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { icon: "segment", value: activeTab === "notes" ? "8" : "12", label: "Topics Detected", color: "text-secondary" },
-                { icon: "style", value: activeTab === "notes" ? "25" : "40", label: "Flashcards", color: "text-primary" },
-                { icon: "quiz", value: activeTab === "notes" ? "10" : "15", label: "Quiz Questions", color: "text-tertiary" },
-                { icon: "schedule", value: activeTab === "notes" ? "2h" : "3h", label: "Study Time", color: "text-secondary" },
-              ].map(s => (
-                <div key={s.label} className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 text-center">
-                  <span className={`material-symbols-outlined ${s.color} mb-2`}>{s.icon}</span>
-                  <p className="text-2xl font-bold text-on-surface">{s.value}</p>
-                  <p className="text-label-sm text-on-surface-variant font-label">{s.label}</p>
+            {(() => {
+              const hasContent =
+                (activeTab === "pdf" && selectedFile) ||
+                (activeTab === "youtube" && youtubeUrl.trim().length > 0) ||
+                (activeTab === "notes" && notesText.trim().length > 0);
+
+              const stats = [
+                {
+                  icon: "segment",
+                  value: hasContent ? (activeTab === "notes" ? "8" : "12") : "—",
+                  label: "Topics Detected",
+                  color: "text-secondary",
+                },
+                {
+                  icon: "style",
+                  value: hasContent
+                    ? selectedComponents.includes("flashcards")
+                      ? activeTab === "notes" ? "25" : "40"
+                      : "—"
+                    : "—",
+                  label: "Flashcards",
+                  color: "text-primary",
+                },
+                {
+                  icon: "quiz",
+                  value: hasContent
+                    ? selectedComponents.includes("quiz")
+                      ? activeTab === "notes" ? "10" : "15"
+                      : "—"
+                    : "—",
+                  label: "Quiz Questions",
+                  color: "text-tertiary",
+                },
+                {
+                  icon: "schedule",
+                  value: hasContent ? (activeTab === "notes" ? "2h" : "3h") : "—",
+                  label: "Study Time",
+                  color: "text-secondary",
+                },
+              ];
+
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {stats.map(s => (
+                    <div key={s.label} className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 text-center">
+                      <span className={`material-symbols-outlined ${s.value === "—" ? "text-on-surface-variant/40" : s.color} mb-2`}>{s.icon}</span>
+                      <p className={`text-2xl font-bold ${s.value === "—" ? "text-on-surface-variant/40" : "text-on-surface"}`}>{s.value}</p>
+                      <p className={`text-label-sm font-label ${s.value === "—" ? "text-on-surface-variant/40" : "text-on-surface-variant"}`}>{s.label}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -343,21 +523,45 @@ export default function CreateGuidePage() {
               <span className="material-symbols-outlined text-primary">settings_suggest</span>
               AI Learning Settings
             </h3>
-            <div className="space-y-4">
-              {settings.map(s => (
-                <div key={s.label} className={`flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-outline-variant/30 ${s.dimmed ? "opacity-70" : ""}`}>
-                  <div className="flex items-center gap-3">
-                    <span className={`material-symbols-outlined ${s.iconColor}`}>{s.icon}</span>
-                    <span className="font-medium font-body">{s.label}</span>
-                  </div>
-                  <input defaultChecked={s.checked} className="w-5 h-5 text-primary rounded-md border-outline-variant focus:ring-primary" type="checkbox" disabled={s.dimmed} />
-                </div>
-              ))}
+            <p className="text-label-sm text-on-surface-variant mb-4 font-label">Select what to generate. Only chosen components will be created.</p>
+            <div className="space-y-3">
+              {COMPONENT_SETTINGS.map(s => {
+                const isChecked = selectedComponents.includes(s.key);
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => toggleComponent(s.key)}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
+                      isChecked
+                        ? "bg-primary/5 border-primary/30"
+                        : "bg-surface-container-low border-outline-variant/30 hover:bg-surface-container"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`material-symbols-outlined ${isChecked ? s.iconColor : "text-on-surface-variant"}`}>{s.icon}</span>
+                      <span className={`font-medium font-body ${isChecked ? "text-on-surface" : "text-on-surface-variant"}`}>{s.label}</span>
+                    </div>
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                      isChecked ? "bg-primary border-primary" : "border-outline-variant"
+                    }`}>
+                      {isChecked && (
+                        <span className="material-symbols-outlined text-white text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+
+            {selectedComponents.length === 0 && (
+              <p className="text-label-sm text-red-500 mt-3 font-label">⚠ Select at least one component.</p>
+            )}
+
             <button
               type="submit"
-              className="w-full mt-8 py-5 bg-gradient-to-r from-primary to-secondary text-on-primary rounded-2xl font-bold text-body-lg shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group"
-              disabled={generating}
+              className="w-full mt-8 py-5 bg-gradient-to-r from-primary to-secondary text-on-primary rounded-2xl font-bold text-body-lg shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group disabled:opacity-60 disabled:pointer-events-none"
+              disabled={generating || selectedComponents.length === 0}
             >
               {generating ? (
                 <div className="flex items-center gap-3">
@@ -374,35 +578,50 @@ export default function CreateGuidePage() {
                 </>
               )}
             </button>
-            <p className="text-center text-label-sm text-on-surface-variant mt-4 font-label">Estimated time: 2-3 minutes</p>
+            {generating ? (
+              <p className="text-center text-label-sm text-primary mt-4 font-label animate-pulse">AI is generating your guide... please wait</p>
+            ) : (
+              <p className="text-center text-label-sm text-on-surface-variant mt-4 font-label">Estimated time: 2-3 minutes</p>
+            )}
           </div>
         </div>
       </div>
 
       {/* Recently Created */}
-      <section className="mt-16">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-headline text-headline-md">Recently Created Guides</h3>
-          <Link to="/guides" className="text-primary font-medium hover:underline flex items-center gap-1">
-            View Library
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {recentGuides.map(g => (
-            <div key={g.title} className="glass-card p-6 rounded-2xl flex items-center gap-4 hover:bg-surface-container-high/50 transition-colors cursor-pointer group">
-              <div className={`w-16 h-16 rounded-xl bg-${g.color} flex items-center justify-center overflow-hidden`}>
-                <span className="material-symbols-outlined text-2xl text-white/80">auto_stories</span>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-body-md group-hover:text-primary transition-colors">{g.title}</h4>
-                <p className="text-body-sm text-on-surface-variant font-body">{g.stats}</p>
-              </div>
-              <span className="material-symbols-outlined text-outline-variant group-hover:text-primary">chevron_right</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {recentGuides.length > 0 && (
+        <section className="mt-16">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-headline text-headline-md">Recently Created Guides</h3>
+            <Link to="/guides" className="text-primary font-medium hover:underline flex items-center gap-1">
+              View Library
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {recentGuides.map(g => (
+              <Link
+                key={g.id}
+                to={g.status === "ready" ? `/guides/${g.id}` : "#"}
+                className={`glass-card p-6 rounded-2xl flex items-center gap-4 hover:bg-surface-container-high/50 transition-colors group ${g.status !== "ready" ? "opacity-60 cursor-default" : "cursor-pointer"}`}
+              >
+                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
+                  <span className="material-symbols-outlined text-2xl text-primary/80">auto_stories</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-body-md group-hover:text-primary transition-colors truncate">{g.title}</h4>
+                  <p className="text-body-sm text-on-surface-variant font-body">
+                    {g._count?.flashcards || 0} Flashcards · {g._count?.quizQuestions || 0} Quiz Qs
+                  </p>
+                  <span className={`text-[10px] font-bold font-label uppercase ${
+                    g.status === "ready" ? "text-green-600" : g.status === "failed" ? "text-red-500" : "text-amber-500"
+                  }`}>{g.status}</span>
+                </div>
+                <span className="material-symbols-outlined text-outline-variant group-hover:text-primary">chevron_right</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </form>
   );
 }

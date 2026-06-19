@@ -31,11 +31,23 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
     // If it's a PDF and linked to a guide, trigger generation in background
     if (isPdf && guideId) {
       const { generateGuideAsync } = require('../services/guideGenerationService');
+      // Parse selectedComponents if sent as JSON string
+      let selectedComponents: string[] | undefined;
+      if (req.body.selectedComponents) {
+        try {
+          selectedComponents = typeof req.body.selectedComponents === 'string'
+            ? JSON.parse(req.body.selectedComponents)
+            : req.body.selectedComponents;
+        } catch {
+          // ignore parse error, fallback to undefined (all components)
+        }
+      }
       generateGuideAsync({
         userId: req.user!.userId,
         guideId,
         sourceType: 'pdf',
         pdfFilePath: file.path,
+        selectedComponents,
       });
     }
 

@@ -2,8 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { ThemeProvider } from './context/ThemeContext'
 
-// Immediate Theme Bootstrapping
+// Immediate Theme Bootstrapping (before React renders to prevent flash)
 const savedTheme = localStorage.getItem("theme");
 const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
@@ -14,6 +15,9 @@ if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 )
+

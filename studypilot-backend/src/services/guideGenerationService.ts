@@ -8,6 +8,11 @@ import fs from 'fs';
 
 export type SourceType = 'pdf' | 'notes' | 'youtube';
 
+// All available component keys
+export type ComponentKey = 'summary' | 'flashcards' | 'quiz' | 'mindMap' | 'studyPlan' | 'revisionSheet' | 'doubtSolver';
+
+export const ALL_COMPONENTS: ComponentKey[] = ['summary', 'flashcards', 'quiz', 'mindMap', 'studyPlan', 'revisionSheet', 'doubtSolver'];
+
 export interface PipelineInput {
   userId: string;
   sourceType: SourceType;
@@ -17,9 +22,17 @@ export interface PipelineInput {
   notesText?: string;
   youtubeUrl?: string;
   guideId?: string; // If provided, update this existing guide instead of creating a new one
+  selectedComponents?: ComponentKey[]; // Which components to generate
+}
+
+function resolveComponents(selectedComponents?: ComponentKey[]): ComponentKey[] {
+  if (!selectedComponents || selectedComponents.length === 0) return ALL_COMPONENTS;
+  return selectedComponents;
 }
 
 export async function generateGuide(input: PipelineInput) {
+  const components = resolveComponents(input.selectedComponents);
+
   // Step 1: Extract raw content & determine sourceIdentifier
   let rawContent: string;
   let sourceIdentifier: string;
@@ -37,7 +50,6 @@ export async function generateGuide(input: PipelineInput) {
       } else {
         throw new Error('PDF file buffer or file path is required.');
       }
-      // Source identifier is MD5 of extracted text
       sourceIdentifier = crypto.createHash('md5').update(rawContent).digest('hex');
       break;
 
@@ -72,10 +84,7 @@ export async function generateGuide(input: PipelineInput) {
   });
 
   if (existingGuide) {
-    // If we were given a guideId, and a cached guide exists, we can merge them or delete the empty one
     if (input.guideId && input.guideId !== existingGuide.id) {
-      // Associate existing guide content with this request or clean up the newly created processing guide
-      // For simplicity, we can delete the newly created empty guide and return the existing cached one
       try {
         await prisma.guide.delete({ where: { id: input.guideId } });
       } catch (err) {
@@ -89,8 +98,8 @@ export async function generateGuide(input: PipelineInput) {
   const cleanedRaw = sanitizeNotes(rawContent);
   const contentForAI = truncateToTokenLimit(cleanedRaw);
 
-  // Step 4: Generate with Groq (with retry)
-  const groqRawResponse = await generateGuideWithGroqRetry(contentForAI);
+  // Step 4: Generate with Groq (with retry), passing selected components
+  const groqRawResponse = await generateGuideWithGroqRetry(contentForAI, 3, components);
 
   // Step 5: Validate
   const validated = parseAndValidateGroqResponse(groqRawResponse);
@@ -99,12 +108,14 @@ export async function generateGuide(input: PipelineInput) {
   const guide = await prisma.$transaction(async (tx) => {
     let guideRecord;
 
+    const componentsStr = JSON.stringify(components);
+
     if (input.guideId) {
-      // Update existing guide
       guideRecord = await tx.guide.update({
         where: { id: input.guideId },
         data: {
-          title: input.title || validated.metadata.subject || 'Untitled Guide',
+          // Always use the user's title; only fall back to AI subject if title was truly blank
+          title: (input.title && input.title.trim()) ? input.title.trim() : (validated.metadata.subject || 'Untitled Guide'),
           sourceIdentifier,
           youtubeUrl: input.youtubeUrl,
           notesText: input.sourceType === 'notes' ? input.notesText : undefined,
@@ -112,14 +123,15 @@ export async function generateGuide(input: PipelineInput) {
           subject: validated.metadata.subject || undefined,
           description: validated.shortSummary || undefined,
           aiSummary: validated.detailedSummary || undefined,
+          selectedComponents: componentsStr,
         },
       });
     } else {
-      // Create new guide
       guideRecord = await tx.guide.create({
         data: {
           userId: input.userId,
-          title: input.title || validated.metadata.subject || 'Untitled Guide',
+          // Always use the user's title; only fall back to AI subject if title was truly blank
+          title: (input.title && input.title.trim()) ? input.title.trim() : (validated.metadata.subject || 'Untitled Guide'),
           sourceType: input.sourceType,
           sourceIdentifier,
           youtubeUrl: input.youtubeUrl,
@@ -128,11 +140,12 @@ export async function generateGuide(input: PipelineInput) {
           subject: validated.metadata.subject || undefined,
           description: validated.shortSummary || undefined,
           aiSummary: validated.detailedSummary || undefined,
+          selectedComponents: componentsStr,
         },
       });
     }
 
-    // Create guide content
+    // Create guide content (always generated - summary is always included)
     await tx.guideContent.create({
       data: {
         guideId: guideRecord.id,
@@ -151,8 +164,8 @@ export async function generateGuide(input: PipelineInput) {
       },
     });
 
-    // Create flashcards
-    if (validated.flashcards.length > 0) {
+    // Create flashcards only if selected
+    if (components.includes('flashcards') && validated.flashcards.length > 0) {
       await tx.flashcard.createMany({
         data: validated.flashcards.map((fc, idx) => ({
           guideId: guideRecord.id,
@@ -164,8 +177,8 @@ export async function generateGuide(input: PipelineInput) {
       });
     }
 
-    // Create quiz questions
-    if (validated.quizQuestions.length > 0) {
+    // Create quiz questions only if selected
+    if (components.includes('quiz') && validated.quizQuestions.length > 0) {
       await tx.quizQuestion.createMany({
         data: validated.quizQuestions.map((q, idx) => ({
           guideId: guideRecord.id,
@@ -178,36 +191,40 @@ export async function generateGuide(input: PipelineInput) {
       });
     }
 
-    // Create revision sheet
-    const revSheet = await tx.revisionSheet.create({
-      data: {
-        guideId: guideRecord.id,
-        title: validated.revisionSheet.title || `${guideRecord.title} Revision Sheet`,
-      },
-    });
-
-    if (validated.revisionSheet.sections.length > 0) {
-      await tx.revisionSection.createMany({
-        data: validated.revisionSheet.sections.map((s, idx) => ({
-          revisionSheetId: revSheet.id,
-          heading: s.heading,
-          bulletPoints: JSON.stringify(s.bulletPoints),
-          orderIndex: idx,
-        })),
+    // Create revision sheet only if selected
+    if (components.includes('revisionSheet')) {
+      const revSheet = await tx.revisionSheet.create({
+        data: {
+          guideId: guideRecord.id,
+          title: validated.revisionSheet.title || `${guideRecord.title} Revision Sheet`,
+        },
       });
+
+      if (validated.revisionSheet.sections.length > 0) {
+        await tx.revisionSection.createMany({
+          data: validated.revisionSheet.sections.map((s, idx) => ({
+            revisionSheetId: revSheet.id,
+            heading: s.heading,
+            bulletPoints: JSON.stringify(s.bulletPoints),
+            orderIndex: idx,
+          })),
+        });
+      }
     }
 
     return guideRecord;
   });
 
-  // Step 6.5: Index guide for RAG doubt solving asynchronously (does not block return)
-  try {
-    const { indexGuide } = require('../lib/vectorStore');
-    indexGuide(guide.id, rawContent).catch((err: any) => {
-      console.error('[VectorStore] Async guide indexing failed:', err);
-    });
-  } catch (err) {
-    console.error('[VectorStore] Failed to import indexGuide:', err);
+  // Step 6.5: Index guide for RAG doubt solving only if doubtSolver is selected
+  if (components.includes('doubtSolver')) {
+    try {
+      const { indexGuide } = require('../lib/vectorStore');
+      indexGuide(guide.id, rawContent).catch((err: any) => {
+        console.error('[VectorStore] Async guide indexing failed:', err);
+      });
+    } catch (err) {
+      console.error('[VectorStore] Failed to import indexGuide:', err);
+    }
   }
 
   // Step 7: Return full guide with all relations
@@ -231,11 +248,10 @@ export async function generateGuide(input: PipelineInput) {
  * Runs guide generation asynchronously in the background.
  */
 export function generateGuideAsync(input: PipelineInput) {
-  // Return immediately, run in background
   (async () => {
     try {
       console.log(`[Background AI] Starting guide generation for user: ${input.userId}, source: ${input.sourceType}`);
-      
+
       if (input.guideId) {
         await prisma.guide.update({
           where: { id: input.guideId },
@@ -247,7 +263,7 @@ export function generateGuideAsync(input: PipelineInput) {
       console.log(`[Background AI] Successfully generated guide for user: ${input.userId}`);
     } catch (err: any) {
       console.error(`[Background AI] Guide generation failed:`, err);
-      
+
       if (input.guideId) {
         try {
           await prisma.guide.update({
