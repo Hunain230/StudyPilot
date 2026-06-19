@@ -93,6 +93,32 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     // 3. Sign token
     const token = signToken({ userId: user.id, email: user.email });
 
+    // Record login/study activity for today if none exists to keep streak alive
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const sessionToday = await prisma.studySession.findFirst({
+      where: {
+        userId: user.id,
+        startedAt: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      },
+    });
+
+    if (!sessionToday) {
+      await prisma.studySession.create({
+        data: {
+          userId: user.id,
+          activityType: 'reading',
+          durationSecs: 60,
+        },
+      });
+    }
+
     return res.status(200).json(
       ApiResponse.success({
         token,

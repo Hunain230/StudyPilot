@@ -82,6 +82,32 @@ export async function getOverviewStats(req: Request, res: Response, next: NextFu
   try {
     const userId = req.user!.userId;
 
+    // Ensure the user has at least one study session today to keep streak active on login/dashboard visit
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const sessionToday = await prisma.studySession.findFirst({
+      where: {
+        userId,
+        startedAt: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      },
+    });
+
+    if (!sessionToday) {
+      await prisma.studySession.create({
+        data: {
+          userId,
+          activityType: 'reading',
+          durationSecs: 60,
+        },
+      });
+    }
+
     const totalGuides = await prisma.guide.count({ where: { userId } });
     const quizAttempts = await prisma.quizAttempt.findMany({
       where: { userId },

@@ -859,7 +859,6 @@ export default function GuideDetailsPage() {
         {/* Tab 5: Mind Map */}
         {activeTab === "mindmap" && guide.content?.topicHierarchy && (
           <MindMapView
-            title={guide.title}
             subject={guide.subject || guide.content.metadata?.subject || "Study Guide"}
             topicHierarchy={guide.content.topicHierarchy}
           />
@@ -869,7 +868,6 @@ export default function GuideDetailsPage() {
         {activeTab === "studyplan" && (
           <StudyPlanView
             guideId={guide.id}
-            guideTitle={guide.title}
             topics={guide.content?.topics || []}
             examDate={examDate}
             setExamDate={setExamDate}
@@ -890,7 +888,6 @@ export default function GuideDetailsPage() {
 
 interface StudyPlanViewProps {
   guideId: string;
-  guideTitle: string;
   topics: string[];
   examDate: string;
   setExamDate: (v: string) => void;
@@ -910,7 +907,7 @@ const SESSION_TYPE_COLORS: Record<string, { bg: string; text: string; icon: stri
 };
 
 function StudyPlanView({
-  guideId, guideTitle, examDate, setExamDate,
+  guideId, examDate, setExamDate,
   studyPlan, setStudyPlan, loadingPlan, setLoadingPlan, planError, setPlanError,
 }: StudyPlanViewProps) {
   const today = new Date();
@@ -1096,12 +1093,11 @@ function StudyPlanView({
 /* ── Mind Map Component ─────────────────────────────────────────────────── */
 
 interface MindMapViewProps {
-  title: string;
   subject: string;
   topicHierarchy: TopicHierarchyItem[];
 }
 
-function MindMapView({ title, subject, topicHierarchy }: MindMapViewProps) {
+function MindMapView({ subject, topicHierarchy }: MindMapViewProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(topicHierarchy.map(t => t.topic)));
 
@@ -1187,7 +1183,7 @@ function MindMapView({ title, subject, topicHierarchy }: MindMapViewProps) {
                   strokeDasharray={isExpanded ? "none" : "6,4"}
                 />
                 {/* Subtopic lines */}
-                {isExpanded && topicNode.subtopics.slice(0, 5).map((sub, j) => {
+                {isExpanded && topicNode.subtopics.slice(0, 5).map((_, j) => {
                   const subCount = Math.min(topicNode.subtopics.length, 5);
                   const spread = Math.PI * 0.7;
                   const subAngle = angle + (j - (subCount - 1) / 2) * (spread / Math.max(subCount - 1, 1));

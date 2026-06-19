@@ -35,7 +35,6 @@ export default function CreateGuidePage() {
 
   const [activeTab, setActiveTab] = useState<Tab>("pdf");
   const [generating, setGenerating] = useState(false);
-  const [generatedGuideId, setGeneratedGuideId] = useState<string | null>(null);
 
   // Guide Metadata
   const [title, setTitle] = useState("");
@@ -188,8 +187,6 @@ export default function CreateGuidePage() {
         selectedComponents,
       });
 
-      setGeneratedGuideId(guide.id);
-
       // 2. If PDF, upload the file with real progress tracking
       if (activeTab === "pdf" && selectedFile) {
         await uploadService.uploadFile(
@@ -248,19 +245,19 @@ export default function CreateGuidePage() {
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Total Guides</p>
               <p className="font-headline text-headline-md text-primary">
-                {totalGuides !== null ? totalGuides : <span className="animate-pulse">—</span>}
+                {totalGuides !== null ? (totalGuides === 0 ? "—" : totalGuides) : <span className="animate-pulse">—</span>}
               </p>
             </div>
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Study Streak</p>
               <p className="font-headline text-headline-md text-secondary">
-                {streak.current} Day{streak.current !== 1 ? "s" : ""}
+                {streak.current === 0 ? "—" : `${streak.current} Day${streak.current !== 1 ? "s" : ""}`}
               </p>
             </div>
             <div className="glass-card px-4 py-3 rounded-2xl text-center min-w-[120px]">
               <p className="text-label-sm text-on-surface-variant uppercase tracking-wider mb-1 font-label">Learning Hours</p>
               <p className="font-headline text-headline-md text-tertiary">
-                {learningHours !== null ? `${learningHours}h` : <span className="animate-pulse">—</span>}
+                {learningHours !== null ? (learningHours === 0 ? "—" : `${learningHours}h`) : <span className="animate-pulse">—</span>}
               </p>
             </div>
           </div>
