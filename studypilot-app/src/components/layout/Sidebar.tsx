@@ -43,7 +43,7 @@ export default function Sidebar({ user }: SidebarProps) {
           <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>school</span>
         </div>
         <div>
-          <h1 className="font-headline text-headline-md font-bold text-primary">ScholarStudy</h1>
+          <h1 className="font-headline text-headline-md font-bold text-primary">StudyPilot</h1>
           <p className="text-xs text-on-surface-variant font-label">Silent Mentor</p>
         </div>
       </div>

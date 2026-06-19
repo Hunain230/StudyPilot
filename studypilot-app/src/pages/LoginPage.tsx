@@ -43,7 +43,7 @@ export default function LoginPage() {
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
                 <span className="material-symbols-outlined text-on-primary text-[24px]">school</span>
               </div>
-              <span className="font-headline text-headline-md text-primary tracking-tight">ScholarStudy</span>
+              <span className="font-headline text-headline-md text-primary tracking-tight">StudyPilot</span>
             </div>
             <h1 className="font-headline text-headline-lg text-on-surface mb-2">Welcome back, Scholar</h1>
             <p className="font-body text-body-md text-on-surface-variant">Continue your journey to mastery.</p>
@@ -131,13 +131,13 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="bg-transparent text-primary flex flex-col md:flex-row justify-between items-center px-margin-mobile md:px-margin-desktop py-unit w-full max-w-container-max mx-auto">
-        <div className="text-headline-md font-headline font-bold text-primary mb-4 md:mb-0">ScholarStudy AI</div>
+        <div className="text-headline-md font-headline font-bold text-primary mb-4 md:mb-0">StudyPilot AI</div>
         <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 mb-4 md:mb-0">
           <a className="text-on-surface-variant hover:text-primary transition-colors text-body-sm" href="#">Privacy Policy</a>
           <a className="text-on-surface-variant hover:text-primary transition-colors text-body-sm" href="#">Terms of Service</a>
           <a className="text-on-surface-variant hover:text-primary transition-colors text-body-sm" href="#">Help Center</a>
         </div>
-        <div className="text-body-sm text-on-surface-variant">© 2024 ScholarStudy AI. All rights reserved.</div>
+        <div className="text-body-sm text-on-surface-variant">© 2024 StudyPilot AI. All rights reserved.</div>
       </footer>
     </div>
   );

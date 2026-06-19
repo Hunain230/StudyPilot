@@ -10,13 +10,25 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
     const parser = new PDFParse({ data: buffer });
     const data = await parser.getText();
     
-    if (!data.text || data.text.trim().length < 10) {
-      throw new Error('PDF appears to be empty or contains only images. Please upload a text-based PDF.');
+    const text = data.text || '';
+    // Clean text of common scanned PDF watermarks/metadata/footers to check actual content density
+    const cleanExtracted = text
+      .replace(/CamScanner/gi, '')
+      .replace(/page\s*\d+/gi, '')
+      .replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const pages = data.total || 1;
+    const charsPerPage = cleanExtracted.length / pages;
+
+    if (cleanExtracted.length < 30 || charsPerPage < 50) {
+      throw new Error('This PDF appears to be a scanned image or contains only images. Please upload a text-based PDF, or copy and paste the text directly into the Study Material tab.');
     }
 
     return data.text;
   } catch (error: any) {
-    if (error.message.includes('PDF appears to be') || error.message.includes('Only PDF')) throw error;
+    if (error.message.includes('PDF appears to be') || error.message.includes('scanned image') || error.message.includes('Only PDF')) throw error;
     throw new Error(`PDF extraction failed: ${error.message}`);
   }
 }

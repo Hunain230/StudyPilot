@@ -345,7 +345,7 @@ export default function MyGuidesPage() {
 
       {/* Footer */}
       <footer className="mt-12 pt-8 border-t border-outline-variant/20 flex justify-between items-center text-on-surface-variant">
-        <p className="text-label-sm font-label">© 2024 ScholarStudy Academic Engine</p>
+        <p className="text-label-sm font-label">© 2024 StudyPilot AI. All rights reserved.</p>
         <div className="flex gap-4">
           <a className="text-label-sm hover:text-primary transition-colors font-label" href="#">Privacy</a>
           <a className="text-label-sm hover:text-primary transition-colors font-label" href="#">Terms</a>
